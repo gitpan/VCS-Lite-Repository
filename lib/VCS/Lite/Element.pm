@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 our $username;  # Aliased to $VCS::Lite::Repository::username
 *VCS::Lite::Element::username = \$VCS::Lite::Repository::username;
 
@@ -29,7 +29,7 @@ sub new {
 	    open FIL, '>', $file or croak("Failed to create $file, $!");
 	    close FIL;
 	}
-	$lite = VCS::Lite->new($file);
+	$lite = $pkg->_slurp_lite($file,%args);
     } else {
 	$file = $lite->id;
     }
@@ -64,7 +64,7 @@ sub check_in {
     my ($self,%args) = @_;
     my $file = $self->{path};
 
-    my $lite = VCS::Lite->new($file);
+    my $lite = $self->_slurp_lite($file);
 
     my $newgen = $self->_assimilate($lite);
     return undef if !$newgen && !$args{check_in_anyway};
@@ -117,7 +117,7 @@ sub fetch {
     
     my $skip_to;
     my @out;
-    for (@{$self->{contents}}) {
+    for (@{$self->_contents}) {
 	if ($skip_to) {
 		if (/^=$skip_to$/) {
 		    undef $skip_to;
@@ -201,8 +201,8 @@ sub _assimilate {
     my (@oldgen,@openers,@closers,$skip_to);
     my $genbase = $args{generation} || $self->latest;
 
-    if (exists $self->{contents}) {
-	for (@{$self->{contents}}) {
+    if (my $cont = $self->_contents) {
+	for (@$cont) {
 	    if ($skip_to) {
 		push @openers, $_;
 		if (/^=$skip_to$/) {
@@ -233,7 +233,7 @@ sub _assimilate {
 	}
 	$oldgen[-1][2] = [@closers] if @closers;
     } else {
-	$self->{contents} = [map $_->[0], @newgen];
+	$self->_contents([map $_->[0], @newgen]);
 	return 1;
     }
 	
@@ -275,7 +275,7 @@ sub _assimilate {
     }
     push @newcont,"=$genbase\n" if ($prev ne 'u');
     return undef unless $changed;
-    $self->{contents} = \@newcont;
+    $self->_contents(\@newcont);
     $genbase;
 }
 
@@ -300,6 +300,21 @@ sub _update_ctrl {
     $self->{$_} = $args{$_} for keys %args;
     $self->{updated} = localtime->datetime;
     $self->_save_ctrl(path => $ctrl);
+}
+
+sub _contents {
+    my $self = shift;
+
+    $self->{contents} = shift if @_;
+    return undef unless exists $self->{contents};
+
+    $self->{contents};
+}
+
+sub _slurp_lite {
+    my ($self,$name) = @_;
+
+    VCS::Lite->new($name);
 }
 
 1;

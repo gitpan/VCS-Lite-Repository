@@ -9,7 +9,7 @@ use File::Spec::Functions qw(catdir catfile rel2abs splitdir);
 use Time::Piece;
 use VCS::Lite::Element;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 our $username = $ENV{VCSLITE_USER} || $ENV{USER};
 our $hidden_repos_dir = '.VCSLite';
 

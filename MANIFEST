@@ -5,6 +5,7 @@ META.yml
 README
 lib/VCS/Lite/Repository.pm
 lib/VCS/Lite/Element.pm
+lib/VCS/Lite/Element/Binary.pm
 lib/VCS/Lite/Common.pm
 t/00_clear.t
 t/01_basic.t
@@ -12,7 +13,10 @@ t/02_traverse.t
 t/03_subsidiary.t
 t/04_repository.t
 t/05_shell.t
+t/06_binary.t
 example/mariner.txt
+example/rook1.bmp
+example/rook2.bmp
 example/scripts/vldiff.pl
 example/scripts/vlpatch.pl
 example/scripts/vlmerge.pl

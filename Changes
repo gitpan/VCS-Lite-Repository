@@ -1,5 +1,9 @@
 Revision history for Perl extension VCS::Lite::Repository.
 
+0.05  Mon Apr 12 20:36:12 2004
+	- Added + hooked in VCS::Lite::Element::Binary
+	  support for binary files
+
 0.04  Sat Mar 20 18:42:04 2004
 	- Fixed remaining VMS problems
 	  Now passes all tests on VMS.
