@@ -11,6 +11,7 @@ t/01_basic.t
 t/02_traverse.t
 t/03_subsidiary.t
 t/04_repository.t
+t/05_shell.t
 example/mariner.txt
 example/scripts/vldiff.pl
 example/scripts/vlpatch.pl

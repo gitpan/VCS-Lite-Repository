@@ -1,4 +1,10 @@
 
+# Before running this test, run the following tests:
+#
+# 00_clear.t - remove ./test
+# 01_clear.t - create fresh ./test
+# 03_subsidiary.t - create repositories test/parent, test/session2, test/session2
+
 use Test::More  tests => 22;
 use File::Spec::Functions qw(catdir catfile updir rel2abs);
 use File::Copy;

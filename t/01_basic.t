@@ -1,6 +1,13 @@
 
+# Run test 00_clear.t first
+
+# This test creates directory ./test as a repository
+# and does rudimentary operations on a standalone repository.
+
+# Note: the test directory is used by subsequent tests
+
 use Test::More  tests => 16;
-use File::Spec::Functions qw(rel2abs);
+use File::Spec::Functions qw(rel2abs catfile curdir);
 
 #01
 use_ok VCS::Lite::Repository;
@@ -38,6 +45,8 @@ isa_ok($eleret[0], VCS::Lite::Element, 'member of array returned by elements');
 
 #08
 is($hwtest->latest,0,"Latest generation of new element = 0");
+
+my $wkdir = rel2abs(curdir);
 
 chdir 'test';
 
@@ -85,7 +94,7 @@ my $diff=$lit1->delta($lit2)->udiff;
 
 $diff =~ s/(@@\d+)\s/$1/g;	# Fix spurious trailing blanks from udiff
 
-my $absfile = rel2abs("helloworld.c");
+my $absfile = catfile($wkdir, 'test', "helloworld.c");
 
 my $expected = <<END;
 --- $absfile\@\@1

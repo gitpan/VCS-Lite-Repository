@@ -1,5 +1,11 @@
 Revision history for Perl extension VCS::Lite::Repository.
 
+0.04  Sat Mar 20 18:42:04 2004
+	- Fixed remaining VMS problems
+	  Now passes all tests on VMS.
+	- Souped up VCShell, added documentation, help, tests
+	  sadly shell test doesn't work on platforms that can't fork
+
 0.03  Sun Jan 25 22:21:13 2004
 	- Fixed Win32 problem: "author not specified" for tests
 	- Refactor common methods into VCS::Lite::Common

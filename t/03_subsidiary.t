@@ -1,4 +1,9 @@
 
+# Before running this test, run the following tests:
+#
+# 00_clear.t - Remove ./test
+# 01_basic.t - Create fresh ./test
+
 use Test::More  tests => 19;
 use File::Spec::Functions qw(splitpath catdir updir catfile);
 
@@ -47,6 +52,8 @@ my $ele;
 
 chdir $scriptdir;
 for (glob '*.*') {
+	next if /VCSLITE/i;	# for VMS
+
 	$ele = VCS::Lite::Element->new($_);
 
 #09 11 13

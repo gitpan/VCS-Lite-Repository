@@ -9,7 +9,12 @@ use File::Find;
 
 find( {
 	bydepth => 1,
-	wanted => sub { (-d $_) ? rmdir($_) : unlink($_); },
+	wanted => sub { if (-d $_) {
+				rmdir $_;
+			} else {
+				1 while unlink $_; 
+			}
+		       },
 	}, 'test');
 
 rmdir 'test';

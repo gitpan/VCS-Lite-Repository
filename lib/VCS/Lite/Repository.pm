@@ -9,7 +9,7 @@ use File::Spec::Functions qw(catdir catfile rel2abs splitdir);
 use Time::Piece;
 use VCS::Lite::Element;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 our $username = $ENV{VCSLITE_USER} || $ENV{USER};
 our $hidden_repos_dir = '.VCSLite';
 
@@ -19,7 +19,7 @@ use base qw(VCS::Lite::Common);
 
 sub new {
     my ($pkg,$path,%args) = @_;
-
+    my $verbose = $args{verbose};
 
     if (-d $path) {
     } elsif (-f $path) {
@@ -34,6 +34,7 @@ sub new {
     my $repos = bless {path => $abspath,
     		creator	=> $username,
     		created => localtime->datetime,
+    		verbose => $verbose,
     		contents => []},$pkg;
 
     if (-d $repos_path) {
@@ -43,20 +44,24 @@ sub new {
 		if $repos->{path} ne $abspath;
     } else {
 	croak 'Author not specified' unless $username;
+	$repos->_mumble("Create repository $abspath");
     	mkdir $repos_path or croak "Unable to make repository: $!";
     	$repos->_save_ctrl(path => $repos_ctrl);
     }
 
     $repos->{author} = $username;
+    $repos->{verbose} = $verbose;
     $repos;
 }
 
 sub add {
     my ($self,$file) = @_;
 
-    my $absfile = catfile($self->{path},$file);
+    my $path = $self->path;
+    my $absfile = catfile($path,$file);
 
     unless (grep {$file eq $_} @{$self->{contents}}) {
+	$self->_mumble("Add $file to $path");
 	my @newlist = sort(@{$self->{contents}},$file);
 	$self->{transactions} ||= [];
 	my @trans = (@{$self->{transactions}}, ['add',$file]);
@@ -96,6 +101,7 @@ sub remove {
     }
     return undef unless $doit;
 
+    $self->_mumble("Remove $file from " . $self->path);
     $self->{transactions} ||= [];
     my @trans = (@{$self->{transactions}}, ['remove',$file]);
     $self->_update_ctrl( contents => \@contents,
@@ -107,8 +113,9 @@ sub contents {
     my $self = shift;
 
     map {my $file = catfile($self->{path},$_); 
-	(-d $file) ? VCS::Lite::Repository->new($file)
-		: VCS::Lite::Element->new($file);} 
+	(-d $file) ? 
+	    VCS::Lite::Repository->new($file, verbose => $self->{verbose})
+	    : VCS::Lite::Element->new($file, verbose => $self->{verbose});} 
     	@{$self->{contents}};
 }
 
@@ -145,13 +152,16 @@ sub path {
 sub clone {
     my ($self,$newpath) = @_;
 
-    my $newrep = VCS::Lite::Repository->new($newpath);
+    $self->_mumble("Cloning " . $self->path . " to $newpath");
+    $self->{transactions} ||= [];
+    my $newrep = VCS::Lite::Repository->new($newpath, 
+    	verbose => $self->{verbose});
     $newrep->_update_ctrl( parent => $self->{path},
     			contents => $self->{contents},
     			original_contents => $self->{contents},
     			parent_baseline => $self->latest);
     $self->traverse('_clone_member',$newpath);
-    VCS::Lite::Repository->new($newpath); 
+    VCS::Lite::Repository->new($newpath, verbose => $self->{verbose}); 
     # This is different from the $newrep object, as it is fully populated.
 }
 
@@ -159,13 +169,16 @@ sub parent {
     my $self = shift;
 
     return undef unless $self->{parent};
-    VCS::Lite::Repository->new($self->{parent});
+    VCS::Lite::Repository->new($self->{parent}, verbose => $self->{verbose});
 }
 
 sub check_in {
     my ($self,%args) = @_;
 
-    if ($self->{transactions} || $args{check_in_anyway}) {
+    $self->_mumble("Checking in " . $self->path);
+    if (($self->{transactions} && @{$self->{transactions}}) 
+		|| $args{check_in_anyway}) {
+        $self->_mumble("Updating directory changes");
 	my $newgen = $args{generation} || $self->latest;
 	$newgen =~ s/(\d+)$/$1+1/e;
 	$self->{generation} ||= {};
@@ -197,7 +210,9 @@ sub commit {
     my $path = $self->path; 
     my $repos_name = (splitdir($self->path))[-1];
     my $parent_repos_path = $self->{parent} || catdir($parent,$repos_name);
-    my $parent_repos = VCS::Lite::Repository->new($parent_repos_path);
+    $self->_mumble("Committing $path to $parent_repos_path");
+    my $parent_repos = VCS::Lite::Repository->new($parent_repos_path, 
+    		verbose => $self->{verbose});
 
     my $orig = VCS::Lite->new($repos_name,undef,$parent_repos->{contents});
     my $changed = VCS::Lite->new($repos_name,undef,$self->{contents});
@@ -213,11 +228,13 @@ sub update {
     my $repos_name = (splitdir($file))[-1];
     $self->{parent} ||= catdir($srep,$repos_name);
     my $parent = $self->{parent};
+    $self->_mumble("Updating $file from $parent");
     my $baseline = $self->{baseline} || 0;
     my $parbas = $self->{parent_baseline};
 
     my $orig = $self->fetch( generation => $baseline);
-    my $parele = VCS::Lite::Repository->new($parent);
+    my $parele = VCS::Lite::Repository->new($parent, 
+    	verbose => $self->{verbose});
     my $parfrom = $parele->fetch( generation => $parbas);
     my $parlat = $parele->latest($parbas);
     my $parto = $parele->fetch( generation => $parlat);
@@ -275,8 +292,10 @@ sub _apply {
 	    $self->remove($val);
 	} elsif ($ind eq '+') {
 	    my $destname = catdir($path,$val);
-	    my $srcname = catdir($srcpath,$val);
-	    mkdir $destname if -d $srcname;
+	    my $srcname = catdir($srcpath,$val); 
+	    # $srcname is false if catdir can't construct a dir, e.g.
+	    # if on VMS and $val contains a dot
+	    mkdir $destname if $srcname && -d $srcname;
 	    $self->add($val);
 	}
     }
@@ -286,7 +305,8 @@ sub _clone_member {
     my ($self,$newpath) = @_;
 
     my $repos_name = (splitdir($self->path))[-1];
-    my $newrep = VCS::Lite::Repository->new($newpath);
+    my $newrep = VCS::Lite::Repository->new($newpath, 
+    	verbose => $self->{verbose});
     my $new_repos = catdir($newpath,$repos_name);
 
     $self->clone($new_repos);

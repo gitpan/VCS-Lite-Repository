@@ -6,7 +6,7 @@ use warnings;
 
 use YAML qw(:all);
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub path {
     my $self = shift;
@@ -26,6 +26,12 @@ sub _load_ctrl {
     LoadFile($args{path});
 }
 
+sub _mumble {
+    my ($self,$msg) = @_;
+
+    print $msg,"\n" if exists($self->{verbose}) && $self->{verbose};
+}
+
 sub latest {
     my ($self,$base) = @_;
 
@@ -35,3 +41,10 @@ sub latest {
     $self->{latest}{$base} || 0;
 }
 
+sub up_generation {
+    my ($self,$gen) = @_;
+
+    $gen =~ s/\.0$// or $gen =~ s/([1-9]\d*)$/$1-1/e or return undef;
+
+    $gen;
+}

@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 our $username;  # Aliased to $VCS::Lite::Repository::username
 *VCS::Lite::Element::username = \$VCS::Lite::Repository::username;
 
@@ -12,7 +12,7 @@ our $hidden_repos_dir = '.VCSLite';
 
 $hidden_repos_dir = '_VCSLITE' if $^O =~ /vms/i;
 
-use File::Spec::Functions qw(splitpath catfile rel2abs);
+use File::Spec::Functions qw(splitpath catfile catdir catpath rel2abs);
 use Time::Piece;
 use Carp;
 use VCS::Lite;
@@ -22,6 +22,7 @@ use base qw(VCS::Lite::Common);
 sub new {
     my ($pkg,$file,%args) = @_;
     my $lite = $file;
+    my $verbose = $args{verbose};
 
     if (!ref $lite) {
 	unless (-f $file) {
@@ -35,9 +36,9 @@ sub new {
     
     $file = rel2abs($file);
     my ($vol,$dir,$fil) = splitpath($file);
-    my $ctrl = catfile(
-    	$vol ? ($vol,$dir) : $dir
-    	,'.VCSLite',"${fil}_yml");
+    my $ctrl = catpath(
+    	$vol, catdir($dir,$hidden_repos_dir)
+    	,"${fil}_yml");
     my $ele;
 
     if (-f $ctrl) {
@@ -46,12 +47,16 @@ sub new {
         $ele->_update_ctrl( path => $file) if $ele->{path} ne $file;
     } else {
 	return undef unless $username;
-	
+
 	$ele = bless {path => $file,
-		author => $username}, $pkg;
+		author => $username,
+		verbose => $verbose,
+		}, $pkg;
+	$ele->_mumble("Creating element $file");
 	$ele->_assimilate($lite);
 	$ele->_save_ctrl(path => $ctrl);
     }
+    $ele->{verbose} = $verbose;
     $ele;
 }
 
@@ -63,6 +68,8 @@ sub check_in {
 
     my $newgen = $self->_assimilate($lite);
     return undef if !$newgen && !$args{check_in_anyway};
+
+    $self->_mumble("Check in $file");
     $self->{generation} ||= {};
     my %gen = %{$self->{generation}};
     $gen{$newgen} = {
@@ -86,7 +93,7 @@ sub repository {
     my ($vol,$dir,$fil) = splitpath($self->{path});
     my $repos_path = $vol ? catdir($vol,$dir) : $dir;
 
-    VCS::Lite::Repository->new($repos_path);
+    VCS::Lite::Repository->new($repos_path, verbose => $self->{verbose});
 }
 
 sub fetch {
@@ -137,22 +144,27 @@ sub commit {
 
     my ($vol,$dir,$file) = splitpath($self->path);
     my $updfile = catfile($parent,$file);
+    my $chg = $self->fetch;
+    my $before = VCS::Lite->new($updfile);
+    return unless $before->delta($chg);
+    $self->_mumble("Committing $file to $parent");
     my $out;
     open $out,'>',$updfile or croak "Failed to open $file for committing, $!";
-    print $out $self->fetch->text;
+    print $out $chg->text;
 }
 
 sub update {
     my ($self,$parent) = @_;
 
     my $file = $self->path;
+    $self->_mumble("Updating $file from $parent");
     my ($vol,$dir,$fil) = splitpath($file);
     my $fromfile = catfile($parent,$fil);
     my $baseline = $self->{baseline} || 0;
     my $parbas = $self->{parent_baseline};
 
     my $orig = $self->fetch( generation => $baseline);
-    my $parele = VCS::Lite::Element->new($fromfile);
+    my $parele = VCS::Lite::Element->new($fromfile, verbose => $self->{verbose});
     my $parfrom = $parele->fetch( generation => $parbas);
     my $parlat = $parele->latest($parbas);
     my $parto = $parele->fetch( generation => $parlat);
@@ -170,7 +182,7 @@ sub update {
 sub _clone_member {
     my ($self,$newpath) = @_;
 
-    my $repos = VCS::Lite::Repository->new($newpath);
+    my $repos = VCS::Lite::Repository->new($newpath, verbose => $self->{verbose});
     my ($vol,$dir,$fil) = splitpath($self->path);
     my $newfil = catfile($newpath,$fil);
     my $out;
@@ -284,7 +296,7 @@ sub _update_ctrl {
 
     my $path = $args{path} || $self->{path};
     my ($vol,$dir,$fil) = splitpath($path);
-    my $ctrl = catfile( $vol ? ($vol,$dir) : $dir ,'.VCSLite',"${fil}_yml");
+    my $ctrl = catpath( $vol, catdir($dir ,$hidden_repos_dir), "${fil}_yml");
     $self->{$_} = $args{$_} for keys %args;
     $self->{updated} = localtime->datetime;
     $self->_save_ctrl(path => $ctrl);
