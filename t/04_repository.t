@@ -5,12 +5,13 @@
 # 01_clear.t - create fresh ./test
 # 03_subsidiary.t - create repositories test/parent, test/session2, test/session2
 
+use strict;
 use Test::More  tests => 22;
 use File::Spec::Functions qw(catdir catfile updir rel2abs);
 use File::Copy;
 
 #01
-use_ok VCS::Lite::Repository;
+use_ok 'VCS::Lite::Repository';
 
 {
     no warnings;
@@ -24,31 +25,31 @@ chdir 'test';
 my $child1 = VCS::Lite::Repository->new('session1');
 
 #02
-isa_ok($child1, VCS::Lite::Repository, "session1 still available from previous tests");
+isa_ok($child1, 'VCS::Lite::Repository', "session1 still available from previous tests");
 
 my $child2 = VCS::Lite::Repository->new('session2');
 
 #03
-isa_ok($child2, VCS::Lite::Repository, "session2 still available from previous tests");
+isa_ok($child2, 'VCS::Lite::Repository', "session2 still available from previous tests");
 
 chdir 'session1';
 
 my $testrep = $child1->add_repository('t');
 
 #04
-isa_ok($testrep, VCS::Lite::Repository, "add_repository return");
+isa_ok($testrep, 'VCS::Lite::Repository', "add_repository return");
 
 my $testele = $testrep->add('04_repository.t');
 
 #05
-isa_ok($testele, VCS::Lite::Element, "add return");
+isa_ok($testele, 'VCS::Lite::Element', "add return");
 
 copy($testfile,'t');
 
 my $scriptrep = VCS::Lite::Repository->new('scripts');
 
 #06
-isa_ok($scriptrep, VCS::Lite::Repository, "Script directory");
+isa_ok($scriptrep, 'VCS::Lite::Repository', "Script directory");
 
 #07
 ok($scriptrep->remove('vlmerge.pl'), "remove");
@@ -57,7 +58,7 @@ chdir updir;
 $child1 = VCS::Lite::Repository->new('session1');
 
 #08
-isa_ok($child1, VCS::Lite::Repository, "Read back repository");
+isa_ok($child1, 'VCS::Lite::Repository', "Read back repository");
 
 $child1->check_in( description => 'Test add and remove');
 
@@ -70,7 +71,7 @@ chdir 'session1';
 $testrep = VCS::Lite::Repository->new('t');
 
 #10
-isa_ok($testrep, VCS::Lite::Repository, "test repository still there");
+isa_ok($testrep, 'VCS::Lite::Repository', "test repository still there");
 
 my @test1 = $testrep->contents;
 
@@ -80,7 +81,7 @@ is(@test1, 1, "contents returns 1 object");
 $scriptrep = VCS::Lite::Repository->new('scripts');
 
 #12
-isa_ok($scriptrep, VCS::Lite::Repository, "script repository still there");
+isa_ok($scriptrep, 'VCS::Lite::Repository', "script repository still there");
 
 my @script1 = $scriptrep->contents;
 
@@ -104,7 +105,7 @@ chdir 'parent';
 $testrep = VCS::Lite::Repository->new('t');
 
 #15
-isa_ok($testrep, VCS::Lite::Repository, "test repository in parent");
+isa_ok($testrep, 'VCS::Lite::Repository', "test repository in parent");
 
 my @testp = $testrep->contents;
 
@@ -114,7 +115,7 @@ is(@testp, 1, "contents returns 1 object");
 $scriptrep = VCS::Lite::Repository->new('scripts');
 
 #17
-isa_ok($scriptrep, VCS::Lite::Repository, "script repository in parent");
+isa_ok($scriptrep, 'VCS::Lite::Repository', "script repository in parent");
 
 my @scriptp = $scriptrep->contents;
 
@@ -133,7 +134,7 @@ chdir 'session2';
 $testrep = VCS::Lite::Repository->new('t');
 
 #19
-isa_ok($testrep, VCS::Lite::Repository, "test repository in session2");
+isa_ok($testrep, 'VCS::Lite::Repository', "test repository in session2");
 
 my @test2 = $testrep->contents;
 
@@ -143,7 +144,7 @@ is(@test2, 1, "contents returns 1 object");
 $scriptrep = VCS::Lite::Repository->new('scripts');
 
 #21
-isa_ok($scriptrep, VCS::Lite::Repository, "script repository in session2");
+isa_ok($scriptrep, 'VCS::Lite::Repository', "script repository in session2");
 
 my @script2 = $scriptrep->contents;
 

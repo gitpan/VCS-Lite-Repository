@@ -18,6 +18,8 @@ This module requires these other modules and libraries:
    Algorithm::Diff
    YAML
    Time::Piece
+   Test::More
+   Params::Validate
 
 COPYRIGHT AND LICENCE
 

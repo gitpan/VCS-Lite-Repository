@@ -1,14 +1,15 @@
 
+use strict;
 use Test::More  tests => 3;
 use File::Spec::Functions qw(splitpath);
 
 #01
-use_ok VCS::Lite::Repository;
+use_ok 'VCS::Lite::Repository';
 
 my $rep = VCS::Lite::Repository->new('example');
 
 #02
-isa_ok($rep, VCS::Lite::Repository, "Successful return from new");
+isa_ok($rep, 'VCS::Lite::Repository', "Successful return from new");
 
 my %latest;
 

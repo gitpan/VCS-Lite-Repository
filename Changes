@@ -1,5 +1,12 @@
 Revision history for Perl extension VCS::Lite::Repository.
 
+0.06  Sun Jun 13 15:37:25 2004
+        - Fix handling of '.' and '..'
+        - Fix bug to do with cloning a freestanding repository
+          added test 10_freestanding.t
+        - Made methods call Params::Validate
+	- Tests now use strict
+
 0.05  Mon Apr 12 20:36:12 2004
 	- Added + hooked in VCS::Lite::Element::Binary
 	  support for binary files

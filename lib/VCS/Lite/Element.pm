@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 our $username;  # Aliased to $VCS::Lite::Repository::username
 *VCS::Lite::Element::username = \$VCS::Lite::Repository::username;
 
@@ -16,11 +16,17 @@ use File::Spec::Functions qw(splitpath catfile catdir catpath rel2abs);
 use Time::Piece;
 use Carp;
 use VCS::Lite;
+use Params::Validate qw(:all);
+use Cwd qw(abs_path);
 
 use base qw(VCS::Lite::Common);
 
 sub new {
-    my ($pkg,$file,%args) = @_;
+    my $pkg = shift;
+    my $file = shift;
+    my %args = validate ( @_, {
+                   verbose => 0,
+               } );
     my $lite = $file;
     my $verbose = $args{verbose};
 
@@ -61,7 +67,11 @@ sub new {
 }
 
 sub check_in {
-    my ($self,%args) = @_;
+    my $self = shift;
+    my %args = validate ( @_, {
+                   check_in_anyway => 0,
+                   description => { type => SCALAR },
+               } );
     my $file = $self->{path};
 
     my $lite = $self->_slurp_lite($file);
@@ -97,7 +107,11 @@ sub repository {
 }
 
 sub fetch {
-    my ($self,%args) = @_;
+    my $self = shift;
+    my %args = validate ( @_, {
+                   time => 0,
+                   generation => 0,
+               } );
 
     my $gen = $args{generation} || $self->latest;
     

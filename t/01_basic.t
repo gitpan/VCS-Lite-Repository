@@ -6,11 +6,12 @@
 
 # Note: the test directory is used by subsequent tests
 
+use strict;
 use Test::More  tests => 16;
 use File::Spec::Functions qw(rel2abs catfile curdir);
 
 #01
-use_ok VCS::Lite::Repository;
+use_ok 'VCS::Lite::Repository';
 
 {
     no warnings;
@@ -30,18 +31,18 @@ like ($@, qr(Failed to create directory), "Invalid filespec croaks");
 my $rep = VCS::Lite::Repository->new('test');
 
 #04
-isa_ok($rep, VCS::Lite::Repository, "Successful return from new");
+isa_ok($rep, 'VCS::Lite::Repository', "Successful return from new");
 
 #05
 my $hwtest = $rep->add_element('helloworld.c');
-isa_ok($hwtest, VCS::Lite::Element, 'add_element');
+isa_ok($hwtest, 'VCS::Lite::Element', 'add_element');
 
 #06
 my @eleret = $rep->elements;
 is (@eleret,1,'elements returned one element');
 
 #07
-isa_ok($eleret[0], VCS::Lite::Element, 'member of array returned by elements');
+isa_ok($eleret[0], 'VCS::Lite::Element', 'member of array returned by elements');
 
 #08
 is($hwtest->latest,0,"Latest generation of new element = 0");
@@ -110,7 +111,7 @@ is($diff,$expected,"Compare diff with expected results");
 my $foorep = $rep->add_repository('foobar');
 
 #14
-isa_ok($foorep,VCS::Lite::Repository,"Return from add_repository");
+isa_ok($foorep, 'VCS::Lite::Repository', "Return from add_repository");
 
 my @cont = $rep->contents;
 

@@ -4,12 +4,13 @@ use strict;
 
 use vars qw/$VERSION @CARP_NOT/;
 
-$VERSION = 0.01;
+$VERSION = '0.02';
 @CARP_NOT = qw/VCS::Lite::Element/;
 
 use base qw/VCS::Lite::Element/;
 use Carp;
 use File::Spec::Functions qw/:ALL/;
+use Params::Validate qw(:all);
 
 =head1 NAME
 
@@ -69,8 +70,14 @@ add it to the repository.
 =cut
 
 sub new {
-    my ($pkg,$name,%args) = @_;
-    my $recsiz = $args{recordsize} || 128;
+    my $pkg = shift;
+    my $name = shift;
+    my %args = validate ( @_, {
+                   verbose => 0,
+                   recordsize => { type => SCALAR, default => 128 },
+               } );
+    my $recsiz = $args{recordsize};
+    delete $args{recordsize};
     my $self = $pkg->SUPER::new($name,%args);
 
     $self->{recordsize} = $recsiz;
@@ -78,9 +85,13 @@ sub new {
 }
 
 sub _slurp_lite {
-    my ($self,$name,%args) = @_;
+    my $self = shift;
+    my $name = shift;
+    my %args = validate ( @_, {
+                   recordsize => { type => SCALAR, default => 128 },
+               } );
     $args{recordsize} = $self->{recordsize} if ref $self;
-    my $recsiz = $args{recordsize} || 128;
+    my $recsiz = ref($self) ? $self->{recordsize} : $args{recordsize};
 
     my $in;
 

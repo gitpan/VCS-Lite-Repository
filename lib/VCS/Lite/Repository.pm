@@ -5,11 +5,13 @@ use strict;
 use warnings;
 
 use Carp;
-use File::Spec::Functions qw(catdir catfile rel2abs splitdir);
+use File::Spec::Functions qw(:ALL !path);
 use Time::Piece;
 use VCS::Lite::Element;
+use Params::Validate qw(:all);
+use Cwd qw(abs_path);
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 our $username = $ENV{VCSLITE_USER} || $ENV{USER};
 our $hidden_repos_dir = '.VCSLite';
 
@@ -18,7 +20,11 @@ $hidden_repos_dir = '_VCSLITE' if $^O =~ /vms/i;
 use base qw(VCS::Lite::Common);
 
 sub new {
-    my ($pkg,$path,%args) = @_;
+    my $pkg = shift;
+    my $path = shift;
+    my %args = validate ( @_, {
+                   verbose => 0,
+               } );
     my $verbose = $args{verbose};
 
     if (-d $path) {
@@ -28,7 +34,7 @@ sub new {
         mkdir $path or croak "Failed to create directory: $!";
     }
 
-    my $abspath = rel2abs($path);
+    my $abspath = abs_path($path);
     my $repos_path = catdir($path,$hidden_repos_dir);
     my $repos_ctrl = catfile($repos_path,'VCSControl.yml');
     my $repos = bless {path => $abspath,
@@ -55,12 +61,28 @@ sub new {
 }
 
 sub add {
-    my ($self,$file) = @_;
+    my $self = shift;
+    my ($file) = validate_pos(@_, { type => SCALAR });
 
     my $path = $self->path;
-    my $absfile = catfile($path,$file);
+    my ($vol,$dirs,$fil) = splitpath($file);
+    my $absfile;
+    my $remainder;
+    if ($dirs) {
+        my ($top,@dirs) = splitdir($dirs);
+        pop @dirs if $dirs[-1] eq '';
+        $absfile = abs_path(catfile($path,$top));
+        mkdir $absfile unless -d $absfile;
+        $remainder = @dirs ? catpath($vol,catdir(@dirs),$fil) : $fil;
+        $file = $top;
+    }
+    else {
+        $absfile = catfile($path,$fil);
+    }
 
-    unless (grep {$file eq $_} @{$self->{contents}}) {
+    unless (($file eq updir) ||
+           ($file eq curdir) ||
+           grep {$file eq $_} @{$self->{contents}}) {
 	$self->_mumble("Add $file to $path");
 	my @newlist = sort(@{$self->{contents}},$file);
 	$self->{transactions} ||= [];
@@ -69,8 +91,9 @@ sub add {
 			transactions => \@trans);
     }
 
-    (-d $absfile) ? VCS::Lite::Repository->new($absfile) :
+    my $newobj = (-d $absfile) ? VCS::Lite::Repository->new($absfile) :
     		VCS::Lite::Element->new($absfile);
+    $remainder ? $newobj->add($remainder) : $newobj;
 }
 
 sub add_element {
@@ -87,7 +110,8 @@ sub add_repository {
 }
 
 sub remove {
-    my ($self,$file) = @_;
+    my $self = shift;
+    my ($file) = validate_pos(@_, { type => SCALAR });
 
     my @contents;
     my $doit = 0;
@@ -150,7 +174,8 @@ sub path {
 }
 
 sub clone {
-    my ($self,$newpath) = @_;
+    my $self = shift;
+    my ($newpath) = validate_pos(@_, { type => SCALAR });
 
     $self->_mumble("Cloning " . $self->path . " to $newpath");
     $self->{transactions} ||= [];
@@ -173,7 +198,11 @@ sub parent {
 }
 
 sub check_in {
-    my ($self,%args) = @_;
+    my $self = shift;
+    my %args = validate ( @_, {
+                   check_in_anyway => 0,
+                   description => { type => SCALAR },
+               } );
 
     $self->_mumble("Checking in " . $self->path);
     if (($self->{transactions} && @{$self->{transactions}}) 
@@ -236,7 +265,7 @@ sub update {
     my $parele = VCS::Lite::Repository->new($parent, 
     	verbose => $self->{verbose});
     my $parfrom = $parele->fetch( generation => $parbas);
-    my $parlat = $parele->latest($parbas);
+    my $parlat = $parele->latest; # was latest($parbas) - buggy
     my $parto = $parele->fetch( generation => $parlat);
     my $origplus = $parfrom->merge($parto,$orig);
 
@@ -252,7 +281,11 @@ sub update {
 }
 
 sub fetch {
-    my ($self,%args) = @_;
+    my $self = shift;
+    my %args = validate ( @_, {
+                   time => 0,
+                   generation => 0,
+               } );
 
     my $gen = exists($args{generation}) ? $args{generation} : $self->latest;
 
@@ -438,8 +471,6 @@ $VCS::Lite::Repository::username. Note: there could be some problems with
 Modperl here - patches welcome.
 
 =head1 TO DO
-
-Support for binary files. (Subclass VCS::Lite::Element)
 
 Integration with L<VCS> suite.
 

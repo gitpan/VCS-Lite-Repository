@@ -6,7 +6,10 @@ WriteMakefile(
     'VERSION_FROM'	=> 'lib/VCS/Lite/Repository.pm', # finds $VERSION
     'PREREQ_PM'		=> {VCS::Lite => 0.05,
     				YAML => 0,
-    				Time::Piece => 0},
+    				Time::Piece => 0,
+    				Params::Validate => 0,
+    				Test::More => 0,
+    				},
     'EXE_FILES'		=> ['bin/VCShell'],
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
       (ABSTRACT_FROM => 'lib/VCS/Lite/Repository.pm', # retrieve abstract from module

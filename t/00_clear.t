@@ -4,6 +4,7 @@
 # Note: this needs to be portable, so we can't use `rm -rf test`.
 #########################
 
+use strict;
 use Test::More  tests => 1;
 use File::Find;
 

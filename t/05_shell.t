@@ -4,6 +4,7 @@
 # 00_clear.t - remove ./test
 # 01_basic.t - create fresh ./test
 
+use strict;
 use Test::More;
 
 if ($^O =~ /vms|win/i) {
@@ -21,7 +22,7 @@ use Cwd;
 my $debug = $ENV{DEBUG};
 
 #01
-use_ok VCS::Lite::Repository;
+use_ok 'VCS::Lite::Repository';
 
 {
     no warnings;
