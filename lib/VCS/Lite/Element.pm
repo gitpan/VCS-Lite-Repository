@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 our $username;  # Aliased to $VCS::Lite::Repository::username
 *VCS::Lite::Element::username = \$VCS::Lite::Repository::username;
 
@@ -28,7 +28,8 @@ sub new {
 	$file = $lite->id;
     }
     
-    my ($vol,$dir,$fil) = splitpath(rel2abs($file));
+    $file = rel2abs($file);
+    my ($vol,$dir,$fil) = splitpath($file);
     my $ctrl = catfile(
     	$vol ? ($vol,$dir) : $dir
     	,'.VCSLite',"${fil}_yml");
@@ -37,6 +38,7 @@ sub new {
     if (-f $ctrl) {
 	$ele = _load_ctrl(path => $ctrl,
                 	package => $pkg);
+        $ele->_update_ctrl( path => $file) if $ele->{path} ne $file;
     } else {
 	return undef unless $username;
 	
@@ -279,7 +281,8 @@ sub _is_parent_of {
 sub _update_ctrl {
     my ($self,%args) = @_;
 
-    my ($vol,$dir,$fil) = splitpath($self->{path});
+    my $path = $args{path} || $self->{path};
+    my ($vol,$dir,$fil) = splitpath($path);
     my $ctrl = catfile( $vol ? ($vol,$dir) : $dir ,'.VCSLite',"${fil}_yml");
     $self->{$_} = $args{$_} for keys %args;
     $self->{updated} = localtime->datetime;

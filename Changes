@@ -1,5 +1,9 @@
 Revision history for Perl extension VCS::Lite::Repository.
 
+0.02  Thu Jan 01 15:11:47 2004
+	- Fixed install problem with paths
+	- Added VCShell.pl to the manifest
+
 0.01  Mon Dec 22 07:38:51 2003
 	- original version; 
 	  Modules VCS::Lite::Repository and VCS::Lite::Element

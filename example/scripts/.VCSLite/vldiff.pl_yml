@@ -37,4 +37,5 @@ contents:
   - " print $diff;\n"
 latest: {}
 path: |-
-  /home/ivor/bld/VCS-Lite-Repository-0.01/example/scripts/vldiff.pl
+  /home/ivor/bld/VCS-Lite-Repository/example/scripts/vldiff.pl
+updated: 2004-01-01T13:41:38

@@ -19,3 +19,4 @@ example/scripts/.VCSLite/VCSControl.yml
 example/scripts/.VCSLite/vldiff.pl_yml
 example/scripts/.VCSLite/vlpatch.pl_yml
 example/scripts/.VCSLite/vlmerge.pl_yml
+bin/VCShell.pl

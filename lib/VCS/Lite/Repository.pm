@@ -10,7 +10,7 @@ use Time::Piece;
 use YAML qw(:all);
 use VCS::Lite::Element;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 our $username = $ENV{VCSLITE_USER} || $ENV{USER};
 
 sub new {
@@ -24,9 +24,10 @@ sub new {
         mkdir $path or croak "Failed to create directory: $!";
     }
 
+    my $abspath = rel2abs($path);
     my $repos_path = catdir($path,'.VCSLite');
     my $repos_ctrl = catfile($repos_path,'VCSControl.yml');
-    my $repos = bless {path => rel2abs($path),
+    my $repos = bless {path => $abspath,
     		creator	=> $username,
     		created => localtime->datetime,
     		elements => []},$pkg;
@@ -34,6 +35,8 @@ sub new {
     if (-d $repos_path) {
 	$repos = _load_ctrl(path => $repos_ctrl,
 		package => $pkg);
+	$repos->_update_ctrl( path => $abspath)
+		if $repos->{path} ne $abspath;
     } else {
 	croak 'Author not specified' unless $username;
     	mkdir $repos_path or croak "Unable to make repository: $!";
@@ -166,7 +169,8 @@ sub _load_ctrl {
 sub _update_ctrl {
     my ($self,%args) = @_;
 
-    my $ctrl = catfile($self->{path},'.VCSLite','VCSControl.yml');
+    my $path = $args{path} || $self->{path};
+    my $ctrl = catfile($path,'.VCSLite','VCSControl.yml');
     for (keys %args) {
 	$self->{$_} = $args{$_};
     }

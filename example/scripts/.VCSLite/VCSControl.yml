@@ -1,11 +1,10 @@
 --- #YAML:1.0 !perl/VCS::Lite::Repository
 author: ivor
-created: 2003-12-30T23:11:35
+created: 2004-01-01T11:41:51
 creator: ivor
 elements:
   - vldiff.pl
   - vlmerge.pl
   - vlpatch.pl
-path: |-
-  /home/ivor/bld/VCS-Lite-Repository-0.01/example/scripts
-updated: 2003-12-30T23:12:57
+path: '/home/ivor/bld/VCS-Lite-Repository/example/scripts'
+updated: 2004-01-01T13:41:38
