@@ -1,0 +1,9 @@
+--- #YAML:1.0 !perl/VCS::Lite::Repository
+author: ivor
+created: 2003-12-30T22:53:12
+creator: ivor
+elements:
+  - mariner.txt
+  - scripts
+path: '/home/ivor/bld/VCS-Lite-Repository-0.01/example'
+updated: 2003-12-30T23:11:35

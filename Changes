@@ -1,0 +1,5 @@
+Revision history for Perl extension VCS::Lite::Repository.
+
+0.01  Mon Dec 22 07:38:51 2003
+	- original version; 
+	  Modules VCS::Lite::Repository and VCS::Lite::Element

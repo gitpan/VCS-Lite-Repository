@@ -1,0 +1,53 @@
+--- #YAML:1.0 !perl/VCS::Lite::Element
+author: ivor
+contents:
+  - " #!/usr/local/bin/perl\n"
+  - " \n"
+  - " use strict;\n"
+  - " use warnings;\n"
+  - " \n"
+  - " use VCS::Lite;\n"
+  - " use Getopt::Long;\n"
+  - " \n"
+  - " my $output;\n"
+  - " \n"
+  - " GetOptions(\n"
+  - " \t'output=s' => \\$output\n"
+  - " \t);\n"
+  - " \n"
+  - " if (@ARGV != 3) {\n"
+  - " \tprint <<END;\n"
+  - " \n"
+  - |2
+     Usage:	$0 [--output outfile] original changed1 changed2
+  - " \n"
+  - |2
+     If --output is not specified, the results are put in place
+  - |2
+     of the original, and the original is renamed to *.orig
+  - " \n"
+  - " END\n"
+  - " \texit;\n"
+  - " }\n"
+  - " \n"
+  - " my ($orig,$chg1,$chg2) = @ARGV;\n"
+  - " \n"
+  - " my $el1 = VCS::Lite->new($orig);\n"
+  - " my $el2 = VCS::Lite->new($chg1);\n"
+  - " my $el3 = VCS::Lite->new($chg2);\n"
+  - " \n"
+  - |2
+     my $el4 = $el1->merge($el2,$el3) or die "Merge failed";
+  - " \n"
+  - " if (!$output) {\n"
+  - " \trename $orig, \"$orig.orig\";\n"
+  - " \t$output = $orig;\n"
+  - " }\n"
+  - " \n"
+  - " open MERGE,\">$output\";\n"
+  - " print MERGE $el4->text;\n"
+  - " close MERGE;\n"
+  - " \n"
+latest: {}
+path: |-
+  /home/ivor/bld/VCS-Lite-Repository-0.01/example/scripts/vlmerge.pl
