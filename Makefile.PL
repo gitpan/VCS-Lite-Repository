@@ -29,7 +29,6 @@ WriteMakefile(
     				Time::Piece => 0,
     				Params::Validate => 0,
     				Test::More => 0,
-    				Cwd => 2.19,
     				},
     'EXE_FILES'		=> \@exe,
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005

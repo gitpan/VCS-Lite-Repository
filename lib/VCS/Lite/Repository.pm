@@ -11,7 +11,7 @@ use VCS::Lite::Element;
 use Params::Validate qw(:all);
 use Cwd qw(abs_path);
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use base qw(VCS::Lite::Common);
 
@@ -198,7 +198,7 @@ sub check_out {
     		} );
 
     $self->_mumble("Check out " . $self->path . " to $newpath");
-    $self->{transactions} ||= [];
+#    $self->{transactions} ||= [];
     my $newrep = VCS::Lite::Repository->new($newpath, 
     	verbose => $self->{verbose},
     	%args);

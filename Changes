@@ -1,5 +1,9 @@
 Revision history for Perl extension VCS::Lite::Repository.
 
+0.09  Sun Dec 12 11:01:25 2004
+	- Fix failing tests. Don't autovivity $parent-{transactions} in 
+	  check_out. Remove dependency on Cwd 2.19
+
 0.08  Sun Dec 05 21:35:47 2004
 	- Major rewrite of shell component - added Term::ReadLine support
 	- VCS::Lite::Shell non-OO API

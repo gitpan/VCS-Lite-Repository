@@ -16,7 +16,7 @@ find( {
 				1 while unlink $_; 
 			}
 		       },
-	}, 'test');
+	}, 'test') if -d 'test';
 
 rmdir 'test';
 
