@@ -7,6 +7,7 @@ lib/VCS/Lite/Repository.pm
 lib/VCS/Lite/Element.pm
 lib/VCS/Lite/Element/Binary.pm
 lib/VCS/Lite/Common.pm
+lib/VCS/Lite/Shell.pm
 lib/VCS/Lite/Store.pm
 lib/VCS/Lite/Store/YAML.pm
 lib/VCS/Lite/Store/Storable.pm
@@ -24,10 +25,10 @@ example/rook2.bmp
 example/scripts/vldiff.pl
 example/scripts/vlpatch.pl
 example/scripts/vlmerge.pl
-example/.VCSLite/VCSControl.yml
-example/.VCSLite/mariner.txt_yml
-example/scripts/.VCSLite/VCSControl.yml
-example/scripts/.VCSLite/vldiff.pl_yml
-example/scripts/.VCSLite/vlpatch.pl_yml
-example/scripts/.VCSLite/vlmerge.pl_yml
+example/.VCSLite/VCSControl.st
+example/.VCSLite/mariner.txt_st
+example/scripts/.VCSLite/VCSControl.st
+example/scripts/.VCSLite/vldiff.pl_st
+example/scripts/.VCSLite/vlpatch.pl_st
+example/scripts/.VCSLite/vlmerge.pl_st
 bin/VCShell

@@ -29,27 +29,27 @@ isa_ok($from, 'VCS::Lite::Repository', "Successful return from new");
 for (@stores) {
 	print "# Using store $_\n";
 
-	my $parent = $from->clone("test/$_/parent", store => $_);
+	my $parent = $from->check_out("test/$_/parent", store => $_);
 
 	chdir 'test';
 	chdir $_;
 
 	#+01
 	isa_ok($parent, 'VCS::Lite::Repository', 
-		"Successful return from clone");
+		"Successful return from check_out");
 
-	my $child1 = $parent->clone('session1', store => $_);
+	my $child1 = $parent->check_out('session1', store => $_);
 
 	#+02
-	isa_ok($child1, 'VCS::Lite::Repository', "Successful clone of clone");
+	isa_ok($child1, 'VCS::Lite::Repository', "Successful check_out of check_out");
 
 	#+03
 	is_deeply($child1->parent,$parent, "Return from parent method");
 
-	my $child2 = $parent->clone('session2', store => $_);
+	my $child2 = $parent->check_out('session2', store => $_);
 
 	#+04
-	isa_ok($child2, 'VCS::Lite::Repository', "Successful clone of clone");
+	isa_ok($child2, 'VCS::Lite::Repository', "Successful check_out of check_out");
 
 	#+05
 	is_deeply($child2->parent,$parent, "Return from parent method");

@@ -11,7 +11,7 @@ use VCS::Lite::Element;
 use Params::Validate qw(:all);
 use Cwd qw(abs_path);
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use base qw(VCS::Lite::Common);
 
@@ -82,8 +82,8 @@ sub add {
         $absfile = catfile($path,$fil);
     }
 
-    unless (($file eq updir) ||
-           ($file eq curdir) ||
+    unless ((catdir($file) eq updir) ||
+           (catdir($file) eq curdir) ||
            grep {$file eq $_} @{$self->{contents}}) {
 	$self->_mumble("Add $file to $path");
 	my @newlist = sort(@{$self->{contents}},$file);
@@ -163,25 +163,41 @@ sub repositories {
 }
 
 sub traverse {
-    my ($self,$func,@args) = @_;
-
+    my $self = shift;
+    my $func = shift;
+    my %args = validate(@_, {
+    		recurse => 0,
+    		params => { type => ARRAYREF | SCALAR, optional => 1 },
+    		} );
+    my @out;
+    $args{params} ||= [];
+    $args{params} = [$args{params}] unless ref $args{params};
+    
     for ($self->contents) {
-	if (ref $func) {
-	    &$func($_,@args);
-	} else {
-	    $_->$func(@args);
-	}
+        if ($args{recurse} && ($args{recurse} eq 'pre')) {
+            my @subout = grep {defined $_} $_->traverse($func,%args);
+            push @out,\@subout if @subout;
+        }
+        my @res = grep {defined $_} ((ref $func) ? 
+        	&$func($_,@{$args{params}}) : 
+        	$_->$func(@{$args{params}}));
+        push @out,@res;
+        if ($args{recurse} && ($args{recurse} ne 'pre')) {
+            my @subout = grep {defined $_} $_->traverse($func,%args);
+            push @out,\@subout if @subout;
+        }
     }
+    @out;
 }
 
-sub clone {
+sub check_out {
     my $self = shift;
     my $newpath = shift;
     my %args = validate(@_, {
     		store => { type => SCALAR|OBJECT, optional => 1 },
     		} );
 
-    $self->_mumble("Cloning " . $self->path . " to $newpath");
+    $self->_mumble("Check out " . $self->path . " to $newpath");
     $self->{transactions} ||= [];
     my $newrep = VCS::Lite::Repository->new($newpath, 
     	verbose => $self->{verbose},
@@ -191,7 +207,7 @@ sub clone {
     			original_contents => $self->{contents},
     			parent_baseline => $self->latest,
     			parent_store => $self->{store});
-    $self->traverse('_clone_member',$newpath,%args);
+    $self->traverse('_check_out_member', params => [$newpath,%args]);
     VCS::Lite::Repository->new($newpath, 
     	verbose => $self->{verbose},
     	%args); 
@@ -231,7 +247,7 @@ sub check_in {
 	$self->_update_ctrl( generation => \%gen, 
     			latest => \%lat);
     }
-    $self->traverse('check_in',%args);
+    $self->traverse('check_in', params => [%args]);
 }
 
 sub commit {
@@ -249,7 +265,8 @@ sub commit {
     my $changed = VCS::Lite->new($repos_name,undef,$self->{contents});
 
     $self->_apply($parent_repos,$orig->delta($changed));
-    $self->traverse('commit', $self->{parent} || catdir($parent,$repos_name));
+    $self->traverse('commit', 
+    	params => $self->{parent} || catdir($parent,$repos_name));
 }
 
 sub update {
@@ -280,7 +297,7 @@ sub update {
         parent_baseline => $parlat);
 
     
-    $self->traverse('update', $parent);
+    $self->traverse('update', params => $parent);
 }
 
 sub fetch {
@@ -351,7 +368,7 @@ sub _apply {
     }
 }
     
-sub _clone_member {
+sub _check_out_member {
     my $self = shift;
     my $newpath = shift;
     my %args = validate(@_, {
@@ -364,7 +381,7 @@ sub _clone_member {
     	%args);
     my $new_repos = catdir($newpath,$repos_name);
 
-    $self->clone($new_repos,%args);
+    $self->check_out($new_repos,%args);
 }
 
 sub _update_ctrl {
@@ -389,7 +406,7 @@ VCS::Lite::Repository - Minimal version Control system - Repository object
 
   use VCS::Lite::Repository;
   my $rep = VCS::Lite::Repository->new($ENV{VCSROOT});
-  my $dev = $rep->clone('/home/me/dev');
+  my $dev = $rep->check_out('/home/me/dev');
   $dev->add_element('testfile.c');
   $dev->add_repository('sub');
   $dev->traverse(\&do_something);
@@ -455,18 +472,54 @@ association between the repository and the element or subrepository.
 
 =head2 traverse
 
-  $rep->traverse(\&mysub,...);
-  $rep->traverse('foo_method',...);
+  $rep->traverse(\&mysub);
+  $rep->traverse('name', recurse => 1);
+  $rep->traverse('bar_method', params => ['bar', 1]);
 
 Apply a callback to each element and repository inside the repository.
-Either call a sub directly, or supply a method name. This is used to
-implement the check_in, commit and update methods for a repository.
+You can supply a method, such as 'name', which results in the method
+being called for all members of the repository rep, or you can supply
+your own code in a coderef (the first parameter passed will still be the
+object traversed. Return values are passed through traverse as a list.
 
-=head2 check_in, commit, update
+If you specify a true value for the recurse option, traverse will also
+be called on each member of $rep. This has no effect on elements 
+(VCS::Lite::Element->traverse returns undef). Return values from a 
+recursion pass appear as an arrayref in the output. If you specify the
+parameter recurse as the value 'pre', traverse will be called on each
+member before the action being applied.
 
-These methods use C<traverse> to iterate all elements in the repository,
-and all subrepositories. See the documentation in L<VCS::Lite::Element>
-for how these are applied to each element.
+Of course, the action can do its own recursion, instead of traverse itself
+applying the recursion. traverse is used internally to implement check_out, 
+check_in, commit and update methods.
+
+=head2 check_out
+
+  my $newrep = $rep->check_out( store => 'YAML');
+
+Note: prior to version 0.08, this was known as clone, but the API has 
+changed to use a more meanningful name. 
+
+Checking out generates a new tree of repositories and elements, putting
+in place a relationship between the repositories; the original is the 
+B<parent repository>.
+
+The new repository does not have to use the same repository store as the
+parent.
+
+=head2 check_in
+
+Note: this is not the opposite operation to check_out. Use this method when
+you have changes that you want to go into a repository.
+
+=head2 commit
+
+This method is used to propagate a change from a repository to its parent.
+
+=head2 update
+
+This method applies changes that have happened to the parent, to the
+repository. This will merge with any changes in the current repository.
 
 =head1 ENVIRONMENT VARIABLES
 

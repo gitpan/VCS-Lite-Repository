@@ -3,65 +3,175 @@
 use strict;
 use warnings;
 
-use VCS::Lite::Repository;
+use Term::ReadLine;
+use VCS::Lite::Shell qw(:all);
+use Parse::RecDescent;
 
-my $prompt = 'VCSLite> ';
+our $prompt = 'VCSLite> ';
+my $term = Term::ReadLine->new('VCS Lite');
+
+my $parser = Parse::RecDescent->new( q{
+	<autotree>
+
+	command: vcs {$return = $item[1]; }
+	|	shell {$return = $item[1]; }
+
+	vcs:	'prompt' arg
+	|	'cd' arg
+	|	'add' arg(s)
+	|	'remove' arg(s)
+	|	'ci' arg(s)
+	|	'check_in' arg(s)
+	|	/co\b/ arg
+	|	'check_out' arg
+	|	'commit'
+	|	'update'
+	|	'fetch' opt_ver redir_out(?)
+	|	'diff' opt_ver opt_ver2 redir_out(?)
+	|	'help'
+	|	'use' arg store_opt(s?)
+	|	'debug' 'off'
+
+	shell:	/.*/
+
+	opt_ver:	arg '@@' /\d+|latest/
+	|		arg
+
+	opt_ver2:	opt_ver	{ $return = $item[1]; }
+	|		'@@' /\d+|latest/ { $return = $item[2]; }
+	|
+	
+	redir_out:	/>>?/ arg
+
+	arg:	'"' /[^"]+/ '"' { $return = $item[2]; }
+	|	/[^@ ]+/ { $return = $item[1]; }
+
+	store_opt:	'--store' arg
+	|		'--user' arg
+	|		'--pass' arg
+	|		'--head' arg
+	|		'--root' arg
+} );
 
 if (@ARGV) {
-	execute_command(join ' ',@ARGV);
+	execute_command(join(' ',@ARGV),$parser);
 	exit(0);
 }
 
-$| = 1;
-
-while (1) {
-	print $prompt;
-	my $cmd = <STDIN>;
-	last if !defined($cmd) or $cmd =~ /^quit/;
-	execute_command($cmd);
+while (defined (my $input = $term->readline($prompt))) {
+	execute_command($input,$parser);
 }
 
 sub execute_command {
-    local $_ = shift;
+    my ($cmd,$parser) = @_;
 
-    /^prompt (.*)/ && (($prompt = $1), return);
+    my $tree = $parser->command($cmd);
 
-    /^cd (.*)/ && (chdir($1),return);
-
-    /^(add|remove|commit|update)\s+(.*)/ && (VCS_function($1,$2),return);
-
-    /^clone\s+(\S+)\s+(\S+)/ && (VCS_clone($1,$2),return);
-
-    /^ci\s+(.*)/ && (VCS_check_in($1),return);
-
-    /^help/ && (VCS_help(),return);
-
-    /^fetch                   #fetch command
-        \s+
-        ([^@ \n]+)            #filename => $1
-        (?:@@                 #optional @@
-        (\w+(?:\.\d+)*))?     #generation specifier => $2
-        \s*
-        (\>.+)?               #redirect => $3
-        /x && (VCS_fetch($1,$2,$3),return);
-       
-    /^diff                    #diff command
-        \s+
-        ([^@ \n]+)            #First file => $1
-        (?:@@                 #optional @@
-        (\w+(?:\.\d+)*))?     #generation specifier => $2
-        (?:\s+                #second param is optional
-        ([^@ \n]+)?           #Second file => $3
-        (?:@@                 #optional @@
-        (\w+(?:\.\d+)*))?)?   #generation specifier => $4
-        \s*
-        (\>.+)?               #redirect => $5
-        /x && (VCS_diff($1,$2,$3,$4,$5),return);
-        
-    system($_);
+    $tree->execute;
 }
 
-sub VCS_help {
+package shell;
+use strict;
+
+sub execute {
+    my $self = shift;
+
+    system($self->{__VALUE__});
+}
+
+package redir_out;
+use strict;
+use Carp;
+
+sub apply {
+    my ($self, $oldfh, $newfh) = @_;
+
+    my $arg = $self->{arg};
+    open $$newfh,$self->{__PATTERN1__},$arg 
+    	or croak "Failed to write to $arg\n$!";
+    $$oldfh = select $$newfh;
+}
+
+package opt_ver;
+use strict;
+
+sub decode {
+    my $self = shift;
+
+    my @out = ($self->{arg});
+    push @out, $self->{__PATTERN1__} if exists $self->{__PATTERN1__};
+    @out;
+}
+
+package store_opt;
+use strict;
+
+sub decode {
+    my $self = shift;
+
+    ($self->{__STRING1__} =~ /--(\w+)/, $self->{arg});
+}
+
+package vcs;
+use strict;
+use Data::Dumper;
+
+our %alias;
+BEGIN {
+    %alias = (
+	ci => 'check_in',
+	co => 'check_out',
+	);
+}
+
+sub execute {
+    my $self = shift;
+
+    my @arg = (exists($self->{arg}) ? $self->{arg} : '.');
+    @arg = map {glob $_} @{$self->{'arg(s)'}} if exists($self->{'arg(s)'});
+
+    my ($oldfh,$newfh);
+    if (exists $self->{'redir_out(?)'}) {
+        my @rd = @{$self->{'redir_out(?)'}};
+        $rd[0]->apply(\$oldfh,\$newfh) if @rd;
+    }
+
+  ACTION:
+  {
+    
+    for (qw/ __VALUE__ __STRING1__ __PATTERN1__ /) {
+	next unless exists $self->{$_};
+	my $meth = $self->{$_};
+	$meth = $alias{$meth} if exists $alias{$meth};
+	if ($self->can($meth)) {
+	    $self->$meth($_) for @arg;
+	    last ACTION;
+	}
+	if (VCS::Lite::Shell->can($meth)) {
+	    no strict 'refs';
+	    &{"VCS::Lite::Shell::$meth"}($_) for @arg;
+	    last ACTION;
+	}
+    }
+    print Dumper $self;
+  }
+  select($oldfh) if $oldfh;
+}
+
+sub cd {
+    my ($self,$dir) = @_;
+
+    chdir $dir;
+}
+
+sub prompt {
+    my ($self,$pmt) = @_;
+
+    $::prompt = $pmt;
+}
+
+
+sub help {
     print <<HELP;
     
 VCS::Lite::Repository Version $VCS::Lite::Repository::VERSION
@@ -80,100 +190,56 @@ VCS::Lite::Repository Version $VCS::Lite::Repository::VERSION
 HELP
 }
 
-sub VCS_function {
-    my ($func,$files) = @_;
+sub check_in {
+    my ($self,$elename) = @_;
 
-    my $repos = VCS::Lite::Repository->new('.', verbose => 1);
-    my @files = $files =~ /("[^"]+"|\S+)/g;
-
-    for (file_list($files)) {
-	$repos->$func($_);
-    }
-}
-
-sub file_list {
-    my $str = shift;
-
-    map {/\*|\?/ ? glob($_) : $_} 
-    	$str =~ /("[^"]+"|\S+)/g; 
-}
-
-sub VCS_check_in {
-    my ($elename) = @_;
-
-    my @expanded = file_list($elename) or return undef;
     print "Enter a description of the change made\n";
     print "Terminate with a dot\n";
     my $remark = '';
     
-    while ((my $input = <STDIN>) ne ".\n") {
-	$remark .= $input;
+    while ((my $input = $term->readline) ne '.') {
+	$remark .= $input . "\n";
     }
-    
-    for (@expanded) {
-	my $ele = (-d $_) ? 
-	    VCS::Lite::Repository->new($elename, verbose => 1) :
-    	    VCS::Lite::Element->new($elename, verbose => 1);
-    				
-	$ele->check_in( description => $remark);
-    }
+
+    VCS::Lite::Shell::check_in($elename,$remark);
 }
 
-sub VCS_clone {
-    my ($parent,$subsidiary) = @_;
+sub fetch {
+    my $self = shift;
 
-    my $repos = VCS::Lite::Repository->new($parent, verbose => 1);
-    $repos->clone($subsidiary);
+    print VCS::Lite::Shell::fetch($self->{opt_ver}->decode);
 }
 
-sub VCS_fetch {
-    my ($elename,$gen,$outfile) = @_;
+sub diff {
+    my $self = shift;
 
-    my $ele = VCS::Lite::Element->new($elename);
-    my $outf;
-
-    if ($outfile) {
-	open $outf,$outfile or warn "Failed to create $outfile, $!";
-    } else {
-	$outf = \*STDOUT;
+    my @el1 = $self->{opt_ver}->decode;
+    my %par = ( file1 => shift @el1);
+    $par{gen1} = shift @el1 if @el1;
+    if (exists $self->{opt_ver2}) {
+    	my $ov2 = $self->{opt_ver2};
+    	if (ref($ov2) eq 'opt_ver') {
+	    my @el2 = $ov2->decode;
+	    $par{file2} = shift @el2;
+	    $par{gen2} = shift @el2 if @el2;
+	}
+	elsif (ref $ov2) {
+	    $par{gen2} = $ov2->{__PATTERN1__};
+	}
     }
-
-    print $outf $ele->fetch( $gen ? (generation => $gen) : undef)->text;
+    print VCS::Lite::Shell::diff(%par);
 }
 
-sub VCS_diff {
-    my ($fil1,$gen1,$fil2,$gen2,$outfile) = @_;
+sub use {
+    my ($self,$store_id) = @_;
 
-    $fil2 ||= $fil1;
-    my (%spc1,%spc2);
-    my $ele2 = VCS::Lite::Element->new($fil2);
-    $gen2 = $ele2->latest unless defined $gen2;
-    my ($ele1);
-    if ($fil1 eq $fil2) {
-        $gen1 = $ele2->up_generation($gen2) unless defined $gen1;
-        print "No prior generation exists\n" unless defined $gen1;
-        $ele1 = $ele2;
-    }
-    else {
-        $ele1 = VCS::Lite::Element->new($fil1);
-        $gen1 = $ele1->latest unless defined $gen1;
-    }
-    my $outf;
+    my %par = map { $_->decode } @{$self->{'store_opt(s?)'}};
+    my $store_type = $par{store} || VCS::Lite::Repository->default_store;
+    delete $par{store};
 
-    my $lit1 = $ele1->fetch( generation => $gen1);
-    my $lit2 = $ele2->fetch( generation => $gen2);
-    my $delt = $lit1->delta($lit2) or return;
-
-    if ($outfile) {
-	open $outf,$outfile or warn "Failed to create $outfile, $!";
-    } else {
-	$outf = \*STDOUT;
-    }
-
-    print $outf $delt->udiff;
+    VCS::Lite::Shell::store($store_id, $store_type, %par);
 }
-    
-    
+
 =head1 NAME
 
 VCShell  - a command line interface for L<VCS::Lite::Repository>
@@ -182,9 +248,10 @@ VCShell  - a command line interface for L<VCS::Lite::Repository>
 
    B<add> element|repository [element|repository...]
    B<remove> name [name...]
-   B<ci> name [name...]
-   B<commit> name [name...]
-   B<update> name [name...]
+   B<ci>|check_in name [name...]
+   B<co>|check_out parent_repository
+   B<commit>
+   B<update>
    B<cd> repository
    B<fetch> name@@gen [>outfile]
    B<diff> file1[@@gen1] [file2[@@gen2]] [>outfile]

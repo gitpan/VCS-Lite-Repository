@@ -92,7 +92,7 @@ for (@stores) {
 	is_deeply(\@repc, [ qw/ mariner.txt scripts t / ], 
 		"Top level contents");
 
-	my $sess = $rep->clone('session3', store => $_);
+	my $sess = $rep->check_out('session3', store => $_);
 
 	#+08
 	isa_ok($sess, 'VCS::Lite::Repository', 'Clone returns');

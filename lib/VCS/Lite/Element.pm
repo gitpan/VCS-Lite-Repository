@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use File::Spec::Functions qw(splitpath catfile catdir catpath rel2abs);
 use Time::Piece;
@@ -111,6 +111,10 @@ sub repository {
     VCS::Lite::Repository->new($repos_path, verbose => $self->{verbose});
 }
 
+sub traverse {
+    undef;
+}
+
 sub fetch {
     my $self = shift;
     my %args = validate ( @_, {
@@ -198,7 +202,7 @@ sub update {
 		parent_baseline => $parlat);
 }
 
-sub _clone_member {
+sub _check_out_member {
     my $self = shift;
     my $newpath = shift;
     my %args = validate(@_, {
@@ -211,7 +215,7 @@ sub _clone_member {
     my ($vol,$dir,$fil) = splitpath($self->path);
     my $newfil = catfile($newpath,$fil);
     my $out;
-    open $out,'>',$newfil or croak "Failed to clone $fil, $!";
+    open $out,'>',$newfil or croak "Failed to check_out $fil, $!";
     print $out $self->fetch->text;
     close $out;
 
@@ -394,7 +398,7 @@ This method creates a new latest generation in the repository for the element.
   $ele->update;
 
 This applies any changes to $ele which have happened in the parent repository,
-i.e. the one that the current repository was cloned from.
+i.e. the one that the current repository was checked out from.
 
 =head2 commit
 

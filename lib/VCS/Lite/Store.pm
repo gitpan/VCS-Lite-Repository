@@ -7,8 +7,9 @@ use warnings;
 use Carp;
 use File::Spec::Functions qw(:ALL !path);
 use Time::Piece;
+use Cwd qw(abs_path);
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 our $hidden_repos_dir = '.VCSLite';
 $hidden_repos_dir = '_VCSLITE' if $^O =~ /vms/i;
 
@@ -60,7 +61,7 @@ sub create {
 sub store_path {
     my ($self,$path,$ext) = @_;
     
-    my ($vol,$dir,$fil) = splitpath($path);
+    my ($vol,$dir,$fil) = splitpath(abs_path($path));
     if ($fil && -d $path) {      # Because of the way splitpath works on Unix
 	$dir = catdir($dir,$fil);
 	$fil = '';

@@ -13,17 +13,26 @@ else {
 }
 close BACK;
 
+my @exe;
+
+if (eval {require Parse::RecDescent; 1;}) {
+	push @exe, 'bin/VCShell';
+}
+else {
+    warn "Parse::RecDescent not available, so VCShell will not be installed";
+}
+
 WriteMakefile(
     'NAME'		=> 'VCS::Lite::Repository',
     'VERSION_FROM'	=> 'lib/VCS/Lite/Repository.pm', # finds $VERSION
     'PREREQ_PM'		=> {VCS::Lite => 0.05,
-    				YAML => 0,
     				Time::Piece => 0,
     				Params::Validate => 0,
     				Test::More => 0,
+    				Cwd => 2.19,
     				},
-    'EXE_FILES'		=> ['bin/VCShell'],
+    'EXE_FILES'		=> \@exe,
     ($] >= 5.005 ?    ## Add these new keywords supported since 5.005
-      (ABSTRACT_FROM => 'lib/VCS/Lite/Repository.pm', # retrieve abstract from module
+      (ABSTRACT_FROM => 'lib/VCS/Lite/Repository.pm', 
        AUTHOR     => 'Ivor Williams') : ()),
 );

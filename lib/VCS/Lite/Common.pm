@@ -4,9 +4,11 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 our $username = $ENV{VCSLITE_USER} || $ENV{USER};
-our $default_store = 'YAML';
+our $default_store = 'Storable';
+
+use File::Spec::Functions qw(splitpath splitdir);
 
 sub path {
     my $self = shift;
@@ -21,10 +23,24 @@ sub path {
     }
 }
 
+sub name {
+    my $self = shift;
+
+    my ($vol, $dir, $fil) = splitpath($self->path);
+
+    $fil || (splitdir $dir)[-1];
+}
+
+sub store {
+    my $self = shift;
+
+    $self->{store};
+}
+
 sub save {
     my ($self) = @_;
 
-    $self->{store}->save($self);
+    $self->store->save($self);
 }
 
 sub _mumble {
