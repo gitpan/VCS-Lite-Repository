@@ -4,15 +4,20 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 our $username;  # Aliased to $VCS::Lite::Repository::username
 *VCS::Lite::Element::username = \$VCS::Lite::Repository::username;
+
+our $hidden_repos_dir = '.VCSLite';
+
+$hidden_repos_dir = '_VCSLITE' if $^O =~ /vms/i;
 
 use File::Spec::Functions qw(splitpath catfile rel2abs);
 use Time::Piece;
 use Carp;
-use YAML qw(:all);
 use VCS::Lite;
+
+use base qw(VCS::Lite::Common);
 
 sub new {
     my ($pkg,$file,%args) = @_;
@@ -36,7 +41,7 @@ sub new {
     my $ele;
 
     if (-f $ctrl) {
-	$ele = _load_ctrl(path => $ctrl,
+	$ele = $pkg->_load_ctrl(path => $ctrl,
                 	package => $pkg);
         $ele->_update_ctrl( path => $file) if $ele->{path} ne $file;
     } else {
@@ -48,14 +53,6 @@ sub new {
 	$ele->_save_ctrl(path => $ctrl);
     }
     $ele;
-}
-
-sub latest {
-    my ($self,$base) = @_;
-
-    $base .= '.' if $base && $base =~ /\d$/;
-    $base ||= '';
-    $self->{latest}{$base} || 0;
 }
 
 sub check_in {
@@ -135,12 +132,6 @@ sub fetch {
     VCS::Lite->new("$file\@\@$gen",undef,\@out);
 }
 
-sub path {
-    my $self = shift;
-
-    $self->{path};
-}
-
 sub commit {
     my ($self,$parent) = @_;
 
@@ -158,14 +149,22 @@ sub update {
     my ($vol,$dir,$fil) = splitpath($file);
     my $fromfile = catfile($parent,$fil);
     my $baseline = $self->{baseline} || 0;
+    my $parbas = $self->{parent_baseline};
+
     my $orig = $self->fetch( generation => $baseline);
     my $parele = VCS::Lite::Element->new($fromfile);
-    my $par = $parele->fetch;
+    my $parfrom = $parele->fetch( generation => $parbas);
+    my $parlat = $parele->latest($parbas);
+    my $parto = $parele->fetch( generation => $parlat);
+    my $origplus = $parfrom->merge($parto,$orig);
+
     my $chg = VCS::Lite->new($file);
-    my $merged = $orig->merge($par,$chg);
+    my $merged = $orig->merge($origplus,$chg);
     my $out;
     open $out,'>',$file or croak "Failed to write back merge of $fil, $!";
     print $out $merged->text;
+    $self->_update_ctrl(baseline => $self->latest,
+		parent_baseline => $parlat);
 }
 
 sub _clone_member {
@@ -178,7 +177,9 @@ sub _clone_member {
     open $out,'>',$newfil or croak "Failed to clone $fil, $!";
     print $out $self->fetch->text;
     close $out;
-    $repos->add_element($fil);
+
+    my $pkg = ref $self;
+    $pkg->new($newfil);
 }
 
 sub _assimilate {
@@ -288,19 +289,6 @@ sub _update_ctrl {
     $self->{updated} = localtime->datetime;
     $self->_save_ctrl(path => $ctrl);
 }
-sub _save_ctrl {
-    my ($self,%args) = @_;
-
-    DumpFile($args{path},$self);
-}
-
-sub _load_ctrl {
-    my (%args) = @_;
-
-    LoadFile($args{path});
-
-}
-                   
 
 1;
 __END__

@@ -1,5 +1,12 @@
 Revision history for Perl extension VCS::Lite::Repository.
 
+0.03  Sun Jan 25 22:21:13 2004
+	- Fixed Win32 problem: "author not specified" for tests
+	- Refactor common methods into VCS::Lite::Common
+	- Add VCShell to executables list
+	- Implement versioning of repositories
+	- Fix VMS problems
+
 0.02  Thu Jan 01 15:11:47 2004
 	- Fixed install problem with paths
 	- Added VCShell.pl to the manifest

@@ -7,11 +7,15 @@ use warnings;
 use Carp;
 use File::Spec::Functions qw(catdir catfile rel2abs splitdir);
 use Time::Piece;
-use YAML qw(:all);
 use VCS::Lite::Element;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 our $username = $ENV{VCSLITE_USER} || $ENV{USER};
+our $hidden_repos_dir = '.VCSLite';
+
+$hidden_repos_dir = '_VCSLITE' if $^O =~ /vms/i;
+
+use base qw(VCS::Lite::Common);
 
 sub new {
     my ($pkg,$path,%args) = @_;
@@ -25,15 +29,15 @@ sub new {
     }
 
     my $abspath = rel2abs($path);
-    my $repos_path = catdir($path,'.VCSLite');
+    my $repos_path = catdir($path,$hidden_repos_dir);
     my $repos_ctrl = catfile($repos_path,'VCSControl.yml');
     my $repos = bless {path => $abspath,
     		creator	=> $username,
     		created => localtime->datetime,
-    		elements => []},$pkg;
+    		contents => []},$pkg;
 
     if (-d $repos_path) {
-	$repos = _load_ctrl(path => $repos_ctrl,
+	$repos = $pkg->_load_ctrl(path => $repos_ctrl,
 		package => $pkg);
 	$repos->_update_ctrl( path => $abspath)
 		if $repos->{path} ne $abspath;
@@ -47,45 +51,83 @@ sub new {
     $repos;
 }
 
-sub add_element {
+sub add {
     my ($self,$file) = @_;
 
     my $absfile = catfile($self->{path},$file);
 
-    unless (grep {$file eq $_} @{$self->{elements}}) {
-	my @newlist = sort(@{$self->{elements}},$file);
-	$self->_update_ctrl( elements => \@newlist);
+    unless (grep {$file eq $_} @{$self->{contents}}) {
+	my @newlist = sort(@{$self->{contents}},$file);
+	$self->{transactions} ||= [];
+	my @trans = (@{$self->{transactions}}, ['add',$file]);
+	$self->_update_ctrl( contents => \@newlist,
+			transactions => \@trans);
     }
 
-    VCS::Lite::Element->new($absfile);
+    (-d $absfile) ? VCS::Lite::Repository->new($absfile) :
+    		VCS::Lite::Element->new($absfile);
+}
+
+sub add_element {
+    my ($self,$file) = @_;
+    (-d $file) ? undef : add(@_);
 }
 
 sub add_repository {
+    my ($self,$dir) = @_;
+    return undef if -f $dir;
+
+    mkdir catfile($self->{path},$dir);
+    add(@_);
+}
+
+sub remove {
     my ($self,$file) = @_;
 
-    my $absfile = catfile($self->{path},$file);
+    my @contents;
+    my $doit = 0;
 
-    unless (($file eq '.') || grep {$file eq $_} @{$self->{elements}}) {
-	my @newlist = sort(@{$self->{elements}},$file);
-	$self->_update_ctrl( elements => \@newlist);
+    for (@{$self->{contents}}) {
+	if ($file eq $_) {
+	    $doit++;
+	} else {
+	    push @contents,$_;
+	}
     }
+    return undef unless $doit;
 
-    VCS::Lite::Repository->new($absfile);
+    $self->{transactions} ||= [];
+    my @trans = (@{$self->{transactions}}, ['remove',$file]);
+    $self->_update_ctrl( contents => \@contents,
+			transactions => \@trans);
+    1;
 }
-    
-sub elements {
+
+sub contents {
     my $self = shift;
 
     map {my $file = catfile($self->{path},$_); 
 	(-d $file) ? VCS::Lite::Repository->new($file)
 		: VCS::Lite::Element->new($file);} 
-    	@{$self->{elements}};
+    	@{$self->{contents}};
+}
+
+sub elements {
+    my $self = shift;
+
+    grep {$_->isa('VCS::Lite::Element')} $self->contents;
+}
+
+sub repositories {
+    my $self = shift;
+
+    grep {$_->isa('VCS::Lite::Repository')} $self->contents;
 }
 
 sub traverse {
     my ($self,$func,@args) = @_;
 
-    for ($self->elements) {
+    for ($self->contents) {
 	if (ref $func) {
 	    &$func($_,@args);
 	} else {
@@ -104,7 +146,10 @@ sub clone {
     my ($self,$newpath) = @_;
 
     my $newrep = VCS::Lite::Repository->new($newpath);
-    $newrep->_update_ctrl( parent => $self->{path});
+    $newrep->_update_ctrl( parent => $self->{path},
+    			contents => $self->{contents},
+    			original_contents => $self->{contents},
+    			parent_baseline => $self->latest);
     $self->traverse('_clone_member',$newpath);
     VCS::Lite::Repository->new($newpath); 
     # This is different from the $newrep object, as it is fully populated.
@@ -118,59 +163,154 @@ sub parent {
 }
 
 sub check_in {
-    my ($self,@args) = @_;
+    my ($self,%args) = @_;
 
-    $self->traverse('check_in',@args);
+    if ($self->{transactions} || $args{check_in_anyway}) {
+	my $newgen = $args{generation} || $self->latest;
+	$newgen =~ s/(\d+)$/$1+1/e;
+	$self->{generation} ||= {};
+	my %gen = %{$self->{generation}};
+	$gen{$newgen} = {
+		author => $username,
+		description => $args{description},
+		updated => localtime->datetime,
+		transactions => $self->{transactions},
+		contents => $self->{contents},
+	};
+
+	$self->{latest} ||= {};
+	my %lat = %{$self->{latest}};
+	$newgen =~ /(\d+\.)*\d+$/;
+	my $base = $1 || '';
+	$lat{$base}=$newgen;
+	delete $self->{transactions};
+
+	$self->_update_ctrl( generation => \%gen, 
+    			latest => \%lat);
+    }
+    $self->traverse('check_in',%args);
 }
 
 sub commit {
     my ($self,$parent) = @_;
 
+    my $path = $self->path; 
     my $repos_name = (splitdir($self->path))[-1];
-    
+    my $parent_repos_path = $self->{parent} || catdir($parent,$repos_name);
+    my $parent_repos = VCS::Lite::Repository->new($parent_repos_path);
+
+    my $orig = VCS::Lite->new($repos_name,undef,$parent_repos->{contents});
+    my $changed = VCS::Lite->new($repos_name,undef,$self->{contents});
+
+    $parent_repos->_apply($orig->delta($changed),$path);
     $self->traverse('commit', $self->{parent} || catdir($parent,$repos_name));
 }
 
 sub update {
-    my ($self,$parent) = @_;
+    my ($self,$srep) = @_;
 
-    my $repos_name = (splitdir($self->path))[-1];
+    my $file = $self->path;
+    my $repos_name = (splitdir($file))[-1];
+    $self->{parent} ||= catdir($srep,$repos_name);
+    my $parent = $self->{parent};
+    my $baseline = $self->{baseline} || 0;
+    my $parbas = $self->{parent_baseline};
+
+    my $orig = $self->fetch( generation => $baseline);
+    my $parele = VCS::Lite::Repository->new($parent);
+    my $parfrom = $parele->fetch( generation => $parbas);
+    my $parlat = $parele->latest($parbas);
+    my $parto = $parele->fetch( generation => $parlat);
+    my $origplus = $parfrom->merge($parto,$orig);
+
+    my $chg = VCS::Lite->new($repos_name,undef,$self->{contents});
+    my $merged = $orig->merge($origplus,$chg);
+    $self->_apply($chg->delta($merged),$parent);
+
+    $self->_update_ctrl(baseline => $self->latest,
+        parent_baseline => $parlat);
+
     
-    $self->traverse('update', $self->{parent} || catdir($parent,$repos_name));
+    $self->traverse('update', $parent);
 }
 
+sub fetch {
+    my ($self,%args) = @_;
+
+    my $gen = exists($args{generation}) ? $args{generation} : $self->latest;
+
+    if ($args{time}) {
+	my $latest_time = '';
+	my $branch = $args{generation} || '';
+	$branch .= '.' if $branch;
+
+	for (keys %{$self->{generation}}) {
+            next unless /^$branch\d+$/;
+	    next if $self->{generation}{$_}{updated} > $args{time};
+	    ($latest_time,$gen) = ($self->{generation}{$_}{updated}, $_)
+		if $self->{generation}{$_}{updated} > $latest_time;
+	}
+	return undef unless $latest_time;
+    }
+    return undef if $gen && $self->{generation} && !$self->{generation}{$gen};
+
+    my $cont = $gen ? 
+		$self->{generation}{$gen}{contents} :
+		$self->{original_contents} || [];
+    my $file = $self->{path};
+    $gen ||= 0;
+    VCS::Lite->new("$file\@\@$gen",undef,$cont);
+}
+                                                                      
+sub _apply {
+    my ($self,$delt,$srcpath) = @_;
+
+    return undef unless $delt;
+
+    my $path = $self->path;
+    
+    for (map {@$_} $delt->hunks) {
+	my ($ind,$lin,$val) = @$_;
+	if ($ind eq '-') {
+	    $self->remove($val);
+	} elsif ($ind eq '+') {
+	    my $destname = catdir($path,$val);
+	    my $srcname = catdir($srcpath,$val);
+	    mkdir $destname if -d $srcname;
+	    $self->add($val);
+	}
+    }
+}
+    
 sub _clone_member {
     my ($self,$newpath) = @_;
 
     my $repos_name = (splitdir($self->path))[-1];
     my $newrep = VCS::Lite::Repository->new($newpath);
-    $newrep->add_repository($repos_name);
-
     my $new_repos = catdir($newpath,$repos_name);
 
     $self->clone($new_repos);
 }
 
-sub _save_ctrl {
-    my ($self,%args) = @_;
-
-    DumpFile($args{path} ,$self);
-}
-
 sub _load_ctrl {
-    my (%args) = @_;
+    my ($pkg,@args) = @_;
+    my $repos = $pkg->SUPER::_load_ctrl(@args);
 
-# Note that this is not a method call. Also, LoadFile can bless into other
-# classes than VCS::Lite::Repository, allowing inheritance.
+# Upgrade from version 0.02. $repos->{elements} replaced by $repos->{contents}
 
-    LoadFile($args{path});
+    if ($repos->{elements}) {
+	$repos->{contents} ||= $repos->{elements};
+	delete $repos->{elements};
+    }
+
+    $repos;
 }
 
 sub _update_ctrl {
     my ($self,%args) = @_;
 
     my $path = $args{path} || $self->{path};
-    my $ctrl = catfile($path,'.VCSLite','VCSControl.yml');
+    my $ctrl = catfile($path,$hidden_repos_dir,'VCSControl.yml');
     for (keys %args) {
 	$self->{$_} = $args{$_};
     }
@@ -213,27 +353,37 @@ If the directory does not contain a repository, an empty repository
 is created.
 
 The control files associated with the repository live under a directory 
-.VCSLite inside the associated directory, and these are in L<YAML> format.
-The repository directory can contain VCS::Lite elements (which
-are version controlled), other repository diretories, and also files
+.VCSLite inside the associated directory (_VCSLITE on VMS as dots are
+not allowed in directory names on this platform), and these are in 
+L<YAML> format. The repository directory can contain VCS::Lite elements 
+(which are version controlled), other repository diretories, and also files
 and directories which are not version controlled.
 
-=head2 add_element
+=head2 add
 
-Returns a VCS::Lite::Element object corresponding to the file inside the
-repository. The element is added to the list of elements inside the 
+  my $ele = $rep->add('foobar.pl');
+  my $ele = $rep->add('mydir');
+
+If given a directory, returns a VCS::Lite::Repository object for the 
+subdirectory. If this does not already have a repository, one is created.
+
+Otherwise it returns the VCS::Lite::Element object corresponding to a file 
+of that name. The element is added to the list of elements inside the 
 repository. If the file does not exist, it is created as zero length.
+If the file does exist, its contents become the generation 0 baseline for
+the element, otherwise generation 0 is the empty file.
 
-If the repository already contains an element of this name, the method
-returns a VCS::Lite::Element object for the existing element.
+The methods add_element and add_repository do the same thing, but check
+to make sure that the paremeter is a plain file (or a directory in the case
+of add_repository) and return undef if this is not the case. Add_repository
+will also create the directory if it does not exist.
 
-When creating a new element, the existing file contents (or the empty file)
-are used as the generation 0 start point for the file.  
+=head2 remove
 
-=head2 add_repository
+   $rep->remove('foobar.pl');
 
-Similar to add_element is add_repository, which returns a VCS::Lite::Repository
-object corresponding to a subdirectory.
+This is the opposite of add. It does not delete any files, merely removes the
+association between the repository and the element or subrepository.
 
 =head2 traverse
 

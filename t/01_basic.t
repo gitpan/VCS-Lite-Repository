@@ -1,9 +1,14 @@
 
-use Test::More  tests => 14;
+use Test::More  tests => 16;
 use File::Spec::Functions qw(rel2abs);
 
 #01
 use_ok VCS::Lite::Repository;
+
+{
+    no warnings;
+    $VCS::Lite::Repository::username = 'test'; # For tests on non-Unix platforms
+}
 
 # Duff args
 
@@ -98,3 +103,13 @@ my $foorep = $rep->add_repository('foobar');
 #14
 isa_ok($foorep,VCS::Lite::Repository,"Return from add_repository");
 
+my @cont = $rep->contents;
+
+#15
+is(@cont, 2, "Objects returned by contents");
+
+$rep->remove('foobar');
+@cont = $rep->contents;
+
+#16
+is(@cont, 1, "Only one object after remove");

@@ -5,6 +5,11 @@ use File::Spec::Functions qw(splitpath catdir updir catfile);
 #01
 use_ok VCS::Lite::Repository;
 
+{
+    no warnings;
+    $VCS::Lite::Repository::username = 'test';  # for tests on non-Unix platforms
+}
+
 my $from = VCS::Lite::Repository->new('example');
 
 #02

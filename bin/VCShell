@@ -37,20 +37,9 @@ sub execute_command {
 sub VCS_function {
     my ($func,$elename) = @_;
 
-    if ($func eq 'add') {
-    
-	my $repos = VCS::Lite::Repository->new('.');
+    my $repos = VCS::Lite::Repository->new('.');
 
-	if (-d $elename) {
-	    $repos->add_repository($elename);
-	} else {
-	    $repos->add_element($elename);
-	}
-    } else {
-	my $repos = VCS::Lite::Repository->new($elename || '.');
-
-	$repos->$func;
-    }
+    $repos->$func($elename);
 }
 
 sub VCS_check_in {
