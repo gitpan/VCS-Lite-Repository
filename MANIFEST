@@ -7,6 +7,9 @@ lib/VCS/Lite/Repository.pm
 lib/VCS/Lite/Element.pm
 lib/VCS/Lite/Element/Binary.pm
 lib/VCS/Lite/Common.pm
+lib/VCS/Lite/Store.pm
+lib/VCS/Lite/Store/YAML.pm
+lib/VCS/Lite/Store/Storable.pm
 t/00_clear.t
 t/01_basic.t
 t/02_traverse.t

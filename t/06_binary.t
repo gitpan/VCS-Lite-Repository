@@ -8,63 +8,78 @@
 
 use strict;
 
-use Test::More  tests => 9;
+use Test::More;
 use File::Spec::Functions qw(:ALL);
 use File::Copy;
 
-#01
-use_ok 'VCS::Lite::Element::Binary';
+our @stores;
 
-{
-    no warnings;
-    $VCS::Lite::Repository::username = 'test'; # For tests on non-Unix platforms
+BEGIN {
+	require 'backends.pl';
+
+	@stores = test_stores();
+	plan tests => 1 + @stores * 8;
+
+	#01
+	use_ok 'VCS::Lite::Element::Binary';
 }
 
-chdir 'test';
+VCS::Lite::Element::Binary->user('test'); # For tests on non-Unix platforms
 
-my $bin_ele = VCS::Lite::Element::Binary->new('rook.bmp');
+for (@stores) {
+	print "Store $_\n";
+	
+	my $bin_ele = VCS::Lite::Element::Binary->new(
+		catfile("test", $_, "rook.bmp"),
+		store => $_);
 
-#02
-isa_ok($bin_ele,'VCS::Lite::Element::Binary','Construction');
+	chdir 'test';
+	chdir $_;
 
-#03
-is($bin_ele->latest,0,"Latest generation of new element = 0");
+	#+01
+	isa_ok($bin_ele,'VCS::Lite::Element::Binary','Construction');
 
-copy updir."/example/rook1.bmp", "rook.bmp";
+	#+02
+	is($bin_ele->latest,0,"Latest generation of new element = 0");
 
-$bin_ele->check_in( description => 'Initial version');
+	copy catfile( updir, updir, "example","rook1.bmp"), "rook.bmp";
 
-#04
-is($bin_ele->latest,1,"Latest generation following check-in = 1");
+	$bin_ele->check_in( description => 'Initial version');
 
-copy updir."/example/rook2.bmp", "rook.bmp";
+	#+03
+	is($bin_ele->latest,1,"Latest generation following check-in = 1");
 
-$bin_ele->check_in(description => 'Black rook');
+	copy catfile( updir, updir, "example","rook2.bmp"), "rook.bmp";
 
-#05
-is($bin_ele->latest,2,"Latest generation following second check-in = 2");
+	$bin_ele->check_in(description => 'Black rook');
 
-my $lit = $bin_ele->fetch( generation => 1);
+	#+04
+	is( $bin_ele->latest, 2,
+		"Latest generation following second check-in = 2");
 
-#06
-isa_ok($lit,'VCS::Lite',"fetch generation 1 returns");
+	my $lit = $bin_ele->fetch( generation => 1);
 
-chdir updir;
-my $orig = VCS::Lite::Element::Binary->_slurp_lite('example/rook1.bmp');
+	#+05
+	isa_ok($lit,'VCS::Lite',"fetch generation 1 returns");
 
-#07
-ok(!$lit->delta($orig),"Fetch returned generation 1 OK");
+	chdir updir;
+	chdir updir;
+	
+	my $orig = $bin_ele->_slurp_lite(catfile(qw'example rook1.bmp'));
 
-$lit = $bin_ele->fetch( generation => 2);
+	#+06
+	ok(!$lit->delta($orig),"Fetch returned generation 1 OK");
 
-#08
-isa_ok($lit,'VCS::Lite',"fetch generation 2 returns");
+	$lit = $bin_ele->fetch( generation => 2);
 
-$orig = VCS::Lite::Element::Binary->_slurp_lite('example/rook2.bmp');
+	#+07
+	isa_ok($lit,'VCS::Lite',"fetch generation 2 returns");
 
-#09
-ok(!$lit->delta($orig),"Fetch returned generation 2 OK");
+	$orig = $bin_ele->_slurp_lite(catfile(qw'example rook2.bmp'));
 
-my @txt1 = $lit->text;
-my @txt2 = $orig->text;
+	#+08
+	ok(!$lit->delta($orig),"Fetch returned generation 2 OK");
 
+	my @txt1 = $lit->text;
+	my @txt2 = $orig->text;
+}

@@ -4,13 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.06';
-our $username;  # Aliased to $VCS::Lite::Repository::username
-*VCS::Lite::Element::username = \$VCS::Lite::Repository::username;
-
-our $hidden_repos_dir = '.VCSLite';
-
-$hidden_repos_dir = '_VCSLITE' if $^O =~ /vms/i;
+our $VERSION = '0.07';
 
 use File::Spec::Functions qw(splitpath catfile catdir catpath rel2abs);
 use Time::Piece;
@@ -25,43 +19,54 @@ sub new {
     my $pkg = shift;
     my $file = shift;
     my %args = validate ( @_, {
+    		   store => {
+    			type => SCALAR | OBJECT,
+    			default => $pkg->default_store,
+    			},
                    verbose => 0,
+                   recordsize => 0, #ignored unless VCS::Lite::Element::Binary
                } );
     my $lite = $file;
     my $verbose = $args{verbose};
+
+    $file = rel2abs($file);
+    my $store_pkg;
+    if (ref $args{store}) {
+        $store_pkg = $args{store};
+    }
+    else {
+	$store_pkg = ($args{store} =~ /\:\:/) ? $args{store} :
+		"VCS::Lite::Store::$args{store}";
+	eval "require $store_pkg"; 
+	warn "Failed to require $store_pkg\n$@" if $@;
+    }
+
+    my $ele = $store_pkg->retrieve($file);
+    if ($ele) {
+        $ele->path($file);
+	return $ele;
+    }
+    my $proto = bless {%args, 
+    		path => $file,
+		}, $pkg;
+
+    $ele = $store_pkg->retrieve_or_create($proto);
+
+    $ele->{path} = $file;
 
     if (!ref $lite) {
 	unless (-f $file) {
 	    open FIL, '>', $file or croak("Failed to create $file, $!");
 	    close FIL;
 	}
-	$lite = $pkg->_slurp_lite($file,%args);
+	$lite = $ele->_slurp_lite($file);
     } else {
-	$file = $lite->id;
+	$file = $lite->id;	# Not handled at present
     }
     
-    $file = rel2abs($file);
-    my ($vol,$dir,$fil) = splitpath($file);
-    my $ctrl = catpath(
-    	$vol, catdir($dir,$hidden_repos_dir)
-    	,"${fil}_yml");
-    my $ele;
-
-    if (-f $ctrl) {
-	$ele = $pkg->_load_ctrl(path => $ctrl,
-                	package => $pkg);
-        $ele->_update_ctrl( path => $file) if $ele->{path} ne $file;
-    } else {
-	return undef unless $username;
-
-	$ele = bless {path => $file,
-		author => $username,
-		verbose => $verbose,
-		}, $pkg;
-	$ele->_mumble("Creating element $file");
-	$ele->_assimilate($lite);
-	$ele->_save_ctrl(path => $ctrl);
-    }
+    $ele->_assimilate($lite);
+    $ele->save;
+ 
     $ele->{verbose} = $verbose;
     $ele;
 }
@@ -83,7 +88,7 @@ sub check_in {
     $self->{generation} ||= {};
     my %gen = %{$self->{generation}};
     $gen{$newgen} = {
-    	author => $username,
+    	author => $self->user,
     	description => $args{description},
 	updated => localtime->datetime,
     };
@@ -194,9 +199,15 @@ sub update {
 }
 
 sub _clone_member {
-    my ($self,$newpath) = @_;
-
-    my $repos = VCS::Lite::Repository->new($newpath, verbose => $self->{verbose});
+    my $self = shift;
+    my $newpath = shift;
+    my %args = validate(@_, {
+                store => { type => SCALAR|OBJECT, optional => 1 },
+                } );
+                                            
+    my $repos = VCS::Lite::Repository->new($newpath, 
+    	verbose => $self->{verbose},
+    	%args);
     my ($vol,$dir,$fil) = splitpath($self->path);
     my $newfil = catfile($newpath,$fil);
     my $out;
@@ -205,7 +216,7 @@ sub _clone_member {
     close $out;
 
     my $pkg = ref $self;
-    $pkg->new($newfil);
+    $pkg->new($newfil,%args);
 }
 
 sub _assimilate {
@@ -310,10 +321,9 @@ sub _update_ctrl {
 
     my $path = $args{path} || $self->{path};
     my ($vol,$dir,$fil) = splitpath($path);
-    my $ctrl = catpath( $vol, catdir($dir ,$hidden_repos_dir), "${fil}_yml");
     $self->{$_} = $args{$_} for keys %args;
     $self->{updated} = localtime->datetime;
-    $self->_save_ctrl(path => $ctrl);
+    $self->save;
 }
 
 sub _contents {

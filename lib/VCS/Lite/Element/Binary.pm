@@ -9,7 +9,7 @@ $VERSION = '0.02';
 
 use base qw/VCS::Lite::Element/;
 use Carp;
-use File::Spec::Functions qw/:ALL/;
+use File::Spec::Functions qw/:ALL !path/;
 use Params::Validate qw(:all);
 
 =head1 NAME
@@ -73,25 +73,17 @@ sub new {
     my $pkg = shift;
     my $name = shift;
     my %args = validate ( @_, {
+    		   store => 0,		# Handled by SUPER::new
                    verbose => 0,
                    recordsize => { type => SCALAR, default => 128 },
                } );
-    my $recsiz = $args{recordsize};
-    delete $args{recordsize};
-    my $self = $pkg->SUPER::new($name,%args);
-
-    $self->{recordsize} = $recsiz;
-    $self;
+    $pkg->SUPER::new($name,%args);
 }
 
 sub _slurp_lite {
     my $self = shift;
     my $name = shift;
-    my %args = validate ( @_, {
-                   recordsize => { type => SCALAR, default => 128 },
-               } );
-    $args{recordsize} = $self->{recordsize} if ref $self;
-    my $recsiz = ref($self) ? $self->{recordsize} : $args{recordsize};
+    my $recsiz = $self->{recordsize};
 
     my $in;
 
@@ -109,9 +101,7 @@ sub _contents {
     my $self = shift;
 
     my $recsiz = $self->{recordsize};
-    my ($vol,$dir,$fil) = splitpath($self->{path});
-    my $bin = catpath( $vol, catdir($dir ,
-              $VCS::Lite::Element::hidden_repos_dir), "${fil}_vbin");
+    my $bin = $self->{store}->store_path($self->path,'vbin');
     my $cont;              
     if (@_) {
         $cont = shift;

@@ -2,120 +2,130 @@
 # Before running this test, run the following tests:
 #
 # 00_clear.t - Remove ./test
-# 01_basic.t - Create fresh ./test
+# 01_basic.t - Create fresh ./test/backend
 
 use strict;
-use Test::More  tests => 19;
+use Test::More;
 use File::Spec::Functions qw(splitpath catdir updir catfile);
+our @stores;
 
-#01
-use_ok "VCS::Lite::Repository";
-
-{
-    no warnings;
-    $VCS::Lite::Repository::username = 'test';  # for tests on non-Unix platforms
+BEGIN {
+	require 'backends.pl';
+	
+	@stores = test_stores();
+	plan tests => 2 + @stores * 17;
+	
+	#01
+	use_ok "VCS::Lite::Repository";
 }
 
-my $from = VCS::Lite::Repository->new('example');
+VCS::Lite::Repository->user('test');  # for tests on non-Unix platforms
 
-chdir 'example';
+my $from = VCS::Lite::Repository->new('example');
 
 #02
 isa_ok($from, 'VCS::Lite::Repository', "Successful return from new");
 
-my $parent = $from->clone('../test/parent');
+for (@stores) {
+	print "# Using store $_\n";
 
-chdir updir;
-chdir 'test';
+	my $parent = $from->clone("test/$_/parent", store => $_);
 
-#03
-isa_ok($parent, 'VCS::Lite::Repository', "Successful return from clone");
+	chdir 'test';
+	chdir $_;
 
-my $child1 = $parent->clone('session1');
+	#+01
+	isa_ok($parent, 'VCS::Lite::Repository', 
+		"Successful return from clone");
 
-#04
-isa_ok($child1, 'VCS::Lite::Repository', "Successful clone of clone");
+	my $child1 = $parent->clone('session1', store => $_);
 
-#05
-is_deeply($child1->parent,$parent, "Return from parent method");
+	#+02
+	isa_ok($child1, 'VCS::Lite::Repository', "Successful clone of clone");
 
-my $child2 = $parent->clone('session2');
+	#+03
+	is_deeply($child1->parent,$parent, "Return from parent method");
 
-#06
-isa_ok($child2, 'VCS::Lite::Repository', "Successful clone of clone");
+	my $child2 = $parent->clone('session2', store => $_);
 
-#07
-is_deeply($child2->parent,$parent, "Return from parent method");
+	#+04
+	isa_ok($child2, 'VCS::Lite::Repository', "Successful clone of clone");
 
-my $scriptdir = catdir(qw(session1 scripts));
-my $scriptrep = VCS::Lite::Repository->new($scriptdir);
+	#+05
+	is_deeply($child2->parent,$parent, "Return from parent method");
 
-#08
-isa_ok($scriptrep, 'VCS::Lite::Repository', "Script directory");
+	my $scriptdir = catdir(qw(session1 scripts));
+	my $scriptrep = VCS::Lite::Repository->new($scriptdir, store => $_);
 
-my $ele;
+	#+06
+	isa_ok($scriptrep, 'VCS::Lite::Repository', "Script directory");
 
-chdir $scriptdir;
-for (glob '*.*') {
-	next if /VCSLITE/i;	# for VMS
+	my $ele;
 
-	$ele = VCS::Lite::Element->new($_);
+	chdir $scriptdir;
+	for my $file (glob '*.*') {
+		next if $file =~ /VCSLITE/i;	# for VMS
 
-#09 11 13
-	isa_ok($ele, 'VCS::Lite::Element', "Element for script $_");
+		$ele = VCS::Lite::Element->new($file, store => $_);
 
-	my $lit = $ele->fetch;
+		#+07 +09 +11
+		isa_ok($ele, 'VCS::Lite::Element', "Element for script $file");
 
-#10 12 14
-	isa_ok($lit, 'VCS::Lite', "fetch from element $_");
+		my $lit = $ele->fetch;
 
-	my $script = $lit->text;
-	# Alter the shebang line as a test
-	$script =~ s!/usr/local/bin/perl!/usr/bin/perl!;
+		#+08 +10 +12
+		isa_ok($lit, 'VCS::Lite', "fetch from element $file");
+
+		my $script = $lit->text;
+		# Alter the shebang line as a test
+		$script =~ s!/usr/local/bin/perl!/usr/bin/perl!;
 	
+		my $fil;
+		open $fil,'>',$file or die "Failed to write $file, $!";
+		print $fil $script;
+	}
+
+	$child1->check_in( description => 'Alter shebang lines');
+
+	$ele = VCS::Lite::Element->new('vldiff.pl', store => $_);
+
+	#+13
+	is($ele->latest,1,"Generation has been checked in");
+
+	$child1->commit;
+
+	$parent->check_in( description => 'Alter shebang lines');
+
+	chdir updir;
+	chdir updir;
+
+	my $scriptcheck = catfile(qw(parent scripts vldiff.pl));
+	my $checkele = VCS::Lite::Element->new($scriptcheck, store => $_);
+
+	#+14
+	isa_ok($checkele, 'VCS::Lite::Element', "Element in parent");
+
+	#+15
+	is($checkele->latest,1,"Generation has been checked in to parent");
+
+	my $otheredit = catfile(qw(session2 scripts vldiff.pl));
 	my $fil;
-	open $fil,'>',$_ or die "Failed to write $_, $!";
-	print $fil $script;
+	open $fil,'>>',$otheredit or die "Failed to write to $otheredit, $!";
+	print $fil '# Here is another edit';
+	close $fil;
+
+	$child2->update;
+	$child2->check_in( description => 'Apply changes from parent');
+
+	$scriptcheck = catfile(qw(session2 scripts vldiff.pl));
+	$checkele = VCS::Lite::Element->new($scriptcheck, store => $_);
+
+	#+16
+	isa_ok($checkele, 'VCS::Lite::Element', "Element in parent");
+
+	#+17
+	is($checkele->latest,1,"Generation has been checked in to parent");
+
+	chdir updir;
+	chdir updir;
 }
-
-$child1->check_in( description => 'Alter shebang lines');
-
-$ele = VCS::Lite::Element->new('vldiff.pl');
-
-#15
-is($ele->latest,1,"Generation has been checked in");
-
-$child1->commit;
-
-$parent->check_in( description => 'Alter shebang lines');
-
-chdir updir;
-chdir updir;
-
-my $scriptcheck = catfile(qw(parent scripts vldiff.pl));
-my $checkele = VCS::Lite::Element->new($scriptcheck);
-
-#16
-isa_ok($checkele, 'VCS::Lite::Element', "Element in parent");
-
-#17
-is($checkele->latest,1,"Generation has been checked in to parent");
-
-my $otheredit = catfile(qw(session2 scripts vldiff.pl));
-my $fil;
-open $fil,'>>',$otheredit or die "Failed to write to $otheredit, $!";
-print $fil '# Here is another edit';
-close $fil;
-
-$child2->update;
-$child2->check_in( description => 'Apply changes from parent');
-
-$scriptcheck = catfile(qw(session2 scripts vldiff.pl));
-$checkele = VCS::Lite::Element->new($scriptcheck);
-
-#18
-isa_ok($checkele, 'VCS::Lite::Element', "Element in parent");
-
-#19
-is($checkele->latest,1,"Generation has been checked in to parent");
-

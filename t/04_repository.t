@@ -2,154 +2,188 @@
 # Before running this test, run the following tests:
 #
 # 00_clear.t - remove ./test
-# 01_clear.t - create fresh ./test
-# 03_subsidiary.t - create repositories test/parent, test/session2, test/session2
+# 01_clear.t - create fresh ./test/backend
+# 03_subsidiary.t - create repositories test/backend/parent etc.
 
 use strict;
-use Test::More  tests => 22;
+use Test::More;
 use File::Spec::Functions qw(catdir catfile updir rel2abs);
 use File::Copy;
 
-#01
-use_ok 'VCS::Lite::Repository';
+our @stores;
 
-{
-    no warnings;
-    $VCS::Lite::Repository::username = 'test';  # for tests on non-Unix platforms
+BEGIN {
+	require 'backends.pl';
+
+	@stores = test_stores();
+	plan tests => 1 + @stores * 21;
+	
+	#01
+	use_ok 'VCS::Lite::Repository';
 }
+
+VCS::Lite::Repository->user('test');  # for tests on non-Unix platforms
 
 my $testfile = rel2abs(catfile(qw! t 04_repository.t !));
 
-chdir 'test';
 
-my $child1 = VCS::Lite::Repository->new('session1');
+for (@stores) {
+	print "# Store $_\n";
 
-#02
-isa_ok($child1, 'VCS::Lite::Repository', "session1 still available from previous tests");
+	my $child1 = VCS::Lite::Repository->new(catdir('test',$_,'session1'),
+				store => $_);
+	
+	chdir 'test';
+	chdir $_;
 
-my $child2 = VCS::Lite::Repository->new('session2');
+	#+01
+	isa_ok($child1, 'VCS::Lite::Repository', 
+		"session1 still available from previous tests");
 
-#03
-isa_ok($child2, 'VCS::Lite::Repository', "session2 still available from previous tests");
+	my $child2 = VCS::Lite::Repository->new('session2',
+				store => $_);
 
-chdir 'session1';
+	#+02
+	isa_ok($child2, 'VCS::Lite::Repository', 
+		"session2 still available from previous tests");
 
-my $testrep = $child1->add_repository('t');
+	chdir 'session1';
 
-#04
-isa_ok($testrep, 'VCS::Lite::Repository', "add_repository return");
+	my $testrep = $child1->add_repository('t');
 
-my $testele = $testrep->add('04_repository.t');
+	#+03
+	isa_ok($testrep, 'VCS::Lite::Repository', "add_repository return");
 
-#05
-isa_ok($testele, 'VCS::Lite::Element', "add return");
+	my $testele = $testrep->add('04_repository.t');
 
-copy($testfile,'t');
+	#+04
+	isa_ok($testele, 'VCS::Lite::Element', "add return");
 
-my $scriptrep = VCS::Lite::Repository->new('scripts');
+	copy($testfile,'t');
 
-#06
-isa_ok($scriptrep, 'VCS::Lite::Repository', "Script directory");
+	my $scriptrep = VCS::Lite::Repository->new('scripts',
+				store => $_);
 
-#07
-ok($scriptrep->remove('vlmerge.pl'), "remove");
+	#+05
+	isa_ok($scriptrep, 'VCS::Lite::Repository', "Script directory");
 
-chdir updir;
-$child1 = VCS::Lite::Repository->new('session1');
+	#+06
+	ok($scriptrep->remove('vlmerge.pl'), "remove");
 
-#08
-isa_ok($child1, 'VCS::Lite::Repository', "Read back repository");
+	chdir updir;
+	$child1 = VCS::Lite::Repository->new('session1',
+				store => $_);
 
-$child1->check_in( description => 'Test add and remove');
+	#+07
+	isa_ok($child1, 'VCS::Lite::Repository', "Read back repository");
 
-my @cont1 = $child1->contents;
+	$child1->check_in( description => 'Test add and remove');
 
-#09
-is(@cont1, 3, "contents returns 3 objects");
+	my @cont1 = $child1->contents;
 
-chdir 'session1';
-$testrep = VCS::Lite::Repository->new('t');
+	#+08
+	is(@cont1, 3, "contents returns 3 objects");
 
-#10
-isa_ok($testrep, 'VCS::Lite::Repository', "test repository still there");
+	chdir 'session1';
+	$testrep = VCS::Lite::Repository->new('t',
+				store => $_);
 
-my @test1 = $testrep->contents;
+	#+09
+	isa_ok($testrep, 'VCS::Lite::Repository', 
+		"test repository still there");
 
-#11
-is(@test1, 1, "contents returns 1 object");
+	my @test1 = $testrep->contents;
 
-$scriptrep = VCS::Lite::Repository->new('scripts');
+	#+10
+	is(@test1, 1, "contents returns 1 object");
 
-#12
-isa_ok($scriptrep, 'VCS::Lite::Repository', "script repository still there");
+	$scriptrep = VCS::Lite::Repository->new('scripts',
+				store => $_);
 
-my @script1 = $scriptrep->contents;
+	#+11
+	isa_ok($scriptrep, 'VCS::Lite::Repository', 
+		"script repository still there");
 
-#13
-is(@script1, 2, "contents returns 2 objects");
+	my @script1 = $scriptrep->contents;
 
-$child1->commit;
+	#+12
+	is(@script1, 2, "contents returns 2 objects");
 
-chdir updir;
+	$child1->commit;
 
-my $parent = VCS::Lite::Repository->new('parent');
+	chdir updir;
 
-$parent->check_in( description => 'Test add and remove');
+	my $parent = VCS::Lite::Repository->new('parent',
+				store => $_);
 
-my @contp = $child1->contents;
+	$parent->check_in( description => 'Test add and remove');
 
-#14
-is(@contp, 3, "contents returns 3 objects");
+	my @contp = $child1->contents;
 
-chdir 'parent';
-$testrep = VCS::Lite::Repository->new('t');
+	#+13
+	is(@contp, 3, "contents returns 3 objects");
 
-#15
-isa_ok($testrep, 'VCS::Lite::Repository', "test repository in parent");
+	chdir 'parent';
+	$testrep = VCS::Lite::Repository->new('t',
+				store => $_);
 
-my @testp = $testrep->contents;
+	#+14
+	isa_ok($testrep, 'VCS::Lite::Repository', 
+		"test repository in parent");
 
-#16
-is(@testp, 1, "contents returns 1 object");
+	my @testp = $testrep->contents;
 
-$scriptrep = VCS::Lite::Repository->new('scripts');
+	#+15
+	is(@testp, 1, "contents returns 1 object");
 
-#17
-isa_ok($scriptrep, 'VCS::Lite::Repository', "script repository in parent");
+	$scriptrep = VCS::Lite::Repository->new('scripts',
+				store => $_);
 
-my @scriptp = $scriptrep->contents;
+	#+16
+	isa_ok($scriptrep, 'VCS::Lite::Repository', 
+		"script repository in parent");
 
-#18
-is(@scriptp, 2, "contents returns 2 objects");
+	my @scriptp = $scriptrep->contents;
 
-$child2->update;
-$child2->check_in( description => 'Test add and remove');
+	#+17
+	is(@scriptp, 2, "contents returns 2 objects");
 
-chdir updir;
+	$child2->update;
+	$child2->check_in( description => 'Test add and remove');
 
-$child2 = VCS::Lite::Repository->new('session2');
+	chdir updir;
 
-chdir 'session2';
+	$child2 = VCS::Lite::Repository->new('session2',
+				store => $_);
 
-$testrep = VCS::Lite::Repository->new('t');
+	chdir 'session2';
 
-#19
-isa_ok($testrep, 'VCS::Lite::Repository', "test repository in session2");
+	$testrep = VCS::Lite::Repository->new('t', store => $_);
 
-my @test2 = $testrep->contents;
+	#+18
+	isa_ok($testrep, 'VCS::Lite::Repository', 
+		"test repository in session2");
 
-#20
-is(@test2, 1, "contents returns 1 object");
+	my @test2 = $testrep->contents;
 
-$scriptrep = VCS::Lite::Repository->new('scripts');
+	#+19
+	is(@test2, 1, "contents returns 1 object");
 
-#21
-isa_ok($scriptrep, 'VCS::Lite::Repository', "script repository in session2");
+	$scriptrep = VCS::Lite::Repository->new('scripts',
+				store => $_);
 
-my @script2 = $scriptrep->contents;
+	#+20
+	isa_ok($scriptrep, 'VCS::Lite::Repository', 
+		"script repository in session2");
 
-#22
-is(@script2, 2, "contents returns 2 objects");
+	my @script2 = $scriptrep->contents;
 
-$child2->commit;
+	#+21
+	is(@script2, 2, "contents returns 2 objects");
 
+	$child2->commit;
+
+	chdir updir;
+	chdir updir;
+	chdir updir;
+}

@@ -6,6 +6,7 @@
 
 use strict;
 use Test::More;
+#use Test::More skip_all => "This test due for rewriting";
 
 if ($^O =~ /vms|win/i) {
     plan skip_all => "Open3 not available on this platform";
@@ -60,6 +61,7 @@ sub read_until_prompt {
     $out;
 }
 
+my $rep = VCS::Lite::Repository->new('test');
 
 print $wtr "cd test\n";
 chdir 'test';
@@ -89,7 +91,7 @@ ok($buff, "Got output after add");
 #09
 like($buff,qr/Add hworld\.pl.*test$/,"Got logging message");
 
-my $rep = VCS::Lite::Repository->new('.');
+$rep = VCS::Lite::Repository->new('.');
 my @cont = $rep->contents;
 
 #10
@@ -126,8 +128,12 @@ $buff = read_until_prompt($pmpt,1);
 #13
 ok(defined($buff), "Got output after entering change desc");
 
+TODO:
+{
+	todo_skip "Skip until logging hooks enabled", 1;
 #14
 like($buff,qr/^Check in .*hworld.pl$/,"ci response log message");
+}
 
 my $hw = VCS::Lite::Element->new('hworld.pl');
 
@@ -156,8 +162,12 @@ $buff = read_until_prompt($pmpt,1);
 #18
 ok(defined($buff), "Got output after entering change desc");
 
+TODO:
+{
+	todo_skip "Skip until logging hooks enabled", 1;
 #19
 like($buff,qr/^Check in .*hworld.pl$/,"ci response log message");
+}
 
 $hw = VCS::Lite::Element->new('hworld.pl');
 

@@ -11,11 +11,7 @@ use VCS::Lite::Element;
 use Params::Validate qw(:all);
 use Cwd qw(abs_path);
 
-our $VERSION = '0.06';
-our $username = $ENV{VCSLITE_USER} || $ENV{USER};
-our $hidden_repos_dir = '.VCSLite';
-
-$hidden_repos_dir = '_VCSLITE' if $^O =~ /vms/i;
+our $VERSION = '0.07';
 
 use base qw(VCS::Lite::Common);
 
@@ -23,6 +19,9 @@ sub new {
     my $pkg = shift;
     my $path = shift;
     my %args = validate ( @_, {
+		   store => { 
+		   	type => SCALAR | OBJECT, 
+		   	default => $pkg->default_store },
                    verbose => 0,
                } );
     my $verbose = $args{verbose};
@@ -35,27 +34,29 @@ sub new {
     }
 
     my $abspath = abs_path($path);
-    my $repos_path = catdir($path,$hidden_repos_dir);
-    my $repos_ctrl = catfile($repos_path,'VCSControl.yml');
-    my $repos = bless {path => $abspath,
-    		creator	=> $username,
-    		created => localtime->datetime,
+    my $proto = bless {path => $abspath,
     		verbose => $verbose,
     		contents => []},$pkg;
-
-    if (-d $repos_path) {
-	$repos = $pkg->_load_ctrl(path => $repos_ctrl,
-		package => $pkg);
-	$repos->_update_ctrl( path => $abspath)
-		if $repos->{path} ne $abspath;
-    } else {
-	croak 'Author not specified' unless $username;
-	$repos->_mumble("Create repository $abspath");
-    	mkdir $repos_path or croak "Unable to make repository: $!";
-    	$repos->_save_ctrl(path => $repos_ctrl);
+    my $store_pkg;
+    if (ref $args{store}) {
+	$store_pkg = $args{store};
     }
-
-    $repos->{author} = $username;
+    else {
+	$store_pkg = ($args{store} =~ /\:\:/) ? $args{store} : 
+		"VCS::Lite::Store::$args{store}";
+	eval "require $store_pkg"; 
+	warn "Failed to require $store_pkg\n$@" if $@;
+    }
+    
+    my $repos = $store_pkg->retrieve_or_create($proto);
+    if (exists $repos->{elements}) {
+        $repos->_mumble("Upgrading repository $abspath from 0.02 to $VERSION");
+	$repos->{contents} ||= $repos->{elements};
+	delete $repos->{elements};
+	$repos->save;
+    }
+    $repos->path($abspath);
+    $repos->{author} = $repos->user;
     $repos->{verbose} = $verbose;
     $repos;
 }
@@ -70,7 +71,8 @@ sub add {
     my $remainder;
     if ($dirs) {
         my ($top,@dirs) = splitdir($dirs);
-        pop @dirs if $dirs[-1] eq '';
+        $top = shift @dirs if $top eq '';     # VMS quirk
+        pop @dirs if !defined($dirs[-1]) || ($dirs[-1] eq '');
         $absfile = abs_path(catfile($path,$top));
         mkdir $absfile unless -d $absfile;
         $remainder = @dirs ? catpath($vol,catdir(@dirs),$fil) : $fil;
@@ -91,8 +93,9 @@ sub add {
 			transactions => \@trans);
     }
 
-    my $newobj = (-d $absfile) ? VCS::Lite::Repository->new($absfile) :
-    		VCS::Lite::Element->new($absfile);
+    my $newobj = (-d $absfile) ? VCS::Lite::Repository->new($absfile,
+			store => $self->{store}) :
+    		VCS::Lite::Element->new($absfile, store => $self->{store});
     $remainder ? $newobj->add($remainder) : $newobj;
 }
 
@@ -138,8 +141,12 @@ sub contents {
 
     map {my $file = catfile($self->{path},$_); 
 	(-d $file) ? 
-	    VCS::Lite::Repository->new($file, verbose => $self->{verbose})
-	    : VCS::Lite::Element->new($file, verbose => $self->{verbose});} 
+	    VCS::Lite::Repository->new($file, 
+	    	verbose => $self->{verbose},
+	    	store => $self->{store})
+	    : VCS::Lite::Element->new($file, 
+	    	verbose => $self->{verbose},
+	    	store => $self->{store});} 
     	@{$self->{contents}};
 }
 
@@ -167,34 +174,28 @@ sub traverse {
     }
 }
 
-sub path {
-    my $self = shift;
-
-    $self->{path};
-}
-
 sub clone {
     my $self = shift;
-    my ($newpath) = validate_pos(@_, { type => SCALAR });
+    my $newpath = shift;
+    my %args = validate(@_, {
+    		store => { type => SCALAR|OBJECT, optional => 1 },
+    		} );
 
     $self->_mumble("Cloning " . $self->path . " to $newpath");
     $self->{transactions} ||= [];
     my $newrep = VCS::Lite::Repository->new($newpath, 
-    	verbose => $self->{verbose});
+    	verbose => $self->{verbose},
+    	%args);
     $newrep->_update_ctrl( parent => $self->{path},
     			contents => $self->{contents},
     			original_contents => $self->{contents},
-    			parent_baseline => $self->latest);
-    $self->traverse('_clone_member',$newpath);
-    VCS::Lite::Repository->new($newpath, verbose => $self->{verbose}); 
+    			parent_baseline => $self->latest,
+    			parent_store => $self->{store});
+    $self->traverse('_clone_member',$newpath,%args);
+    VCS::Lite::Repository->new($newpath, 
+    	verbose => $self->{verbose},
+    	%args); 
     # This is different from the $newrep object, as it is fully populated.
-}
-
-sub parent {
-    my $self = shift;
-
-    return undef unless $self->{parent};
-    VCS::Lite::Repository->new($self->{parent}, verbose => $self->{verbose});
 }
 
 sub check_in {
@@ -213,7 +214,7 @@ sub check_in {
 	$self->{generation} ||= {};
 	my %gen = %{$self->{generation}};
 	$gen{$newgen} = {
-		author => $username,
+		author => $self->user,
 		description => $args{description},
 		updated => localtime->datetime,
 		transactions => $self->{transactions},
@@ -241,12 +242,13 @@ sub commit {
     my $parent_repos_path = $self->{parent} || catdir($parent,$repos_name);
     $self->_mumble("Committing $path to $parent_repos_path");
     my $parent_repos = VCS::Lite::Repository->new($parent_repos_path, 
-    		verbose => $self->{verbose});
+    		verbose => $self->{verbose},
+    		store => $self->{parent_store});
 
     my $orig = VCS::Lite->new($repos_name,undef,$parent_repos->{contents});
     my $changed = VCS::Lite->new($repos_name,undef,$self->{contents});
 
-    $parent_repos->_apply($orig->delta($changed),$path);
+    $self->_apply($parent_repos,$orig->delta($changed));
     $self->traverse('commit', $self->{parent} || catdir($parent,$repos_name));
 }
 
@@ -263,7 +265,8 @@ sub update {
 
     my $orig = $self->fetch( generation => $baseline);
     my $parele = VCS::Lite::Repository->new($parent, 
-    	verbose => $self->{verbose});
+    	verbose => $self->{verbose},
+    	store => $self->{parent_store});
     my $parfrom = $parele->fetch( generation => $parbas);
     my $parlat = $parele->latest; # was latest($parbas) - buggy
     my $parto = $parele->fetch( generation => $parlat);
@@ -271,7 +274,7 @@ sub update {
 
     my $chg = VCS::Lite->new($repos_name,undef,$self->{contents});
     my $merged = $orig->merge($origplus,$chg);
-    $self->_apply($chg->delta($merged),$parent);
+    $parele->_apply($self,$chg->delta($merged));
 
     $self->_update_ctrl(baseline => $self->latest,
         parent_baseline => $parlat);
@@ -313,63 +316,67 @@ sub fetch {
 }
                                                                       
 sub _apply {
-    my ($self,$delt,$srcpath) = @_;
+    my ($src,$dest,$delt) = @_;
 
     return undef unless $delt;
 
-    my $path = $self->path;
+    my $srcpath = $src->path;
+    my $path = $dest->path;
     
     for (map {@$_} $delt->hunks) {
 	my ($ind,$lin,$val) = @$_;
 	if ($ind eq '-') {
-	    $self->remove($val);
+	    $dest->remove($val);
 	} elsif ($ind eq '+') {
 	    my $destname = catdir($path,$val);
 	    my $srcname = catdir($srcpath,$val); 
 	    # $srcname is false if catdir can't construct a dir, e.g.
 	    # if on VMS and $val contains a dot
 	    mkdir $destname if $srcname && -d $srcname;
-	    $self->add($val);
+	    my $newobj = $dest->add($val);
+	    if (exists($dest->{parent}) && ($dest->{parent} eq $srcpath)) {
+	        $newobj->{parent} = catdir($dest->{parent},$val);
+	        $newobj->{parent_store} = $dest->{parent_store};
+	        $newobj->{parent_baseline} = 0;
+	        $newobj->save;
+	    }
+	    if (exists($src->{parent}) && ($src->{parent} eq $path)) {
+	        my $srcobj = $src->{store}->retrieve($srcname);
+	        $srcobj->{parent} = catdir($src->{parent},$val);
+	        $srcobj->{parent_store} = $src->{parent_store};
+	        $srcobj->{parent_baseline} = 0;
+	        $srcobj->save;
+	    }
 	}
     }
 }
     
 sub _clone_member {
-    my ($self,$newpath) = @_;
+    my $self = shift;
+    my $newpath = shift;
+    my %args = validate(@_, {
+    		store => { type => SCALAR|OBJECT, optional => 1 },
+    		} );
 
     my $repos_name = (splitdir($self->path))[-1];
     my $newrep = VCS::Lite::Repository->new($newpath, 
-    	verbose => $self->{verbose});
+    	verbose => $self->{verbose},
+    	%args);
     my $new_repos = catdir($newpath,$repos_name);
 
-    $self->clone($new_repos);
-}
-
-sub _load_ctrl {
-    my ($pkg,@args) = @_;
-    my $repos = $pkg->SUPER::_load_ctrl(@args);
-
-# Upgrade from version 0.02. $repos->{elements} replaced by $repos->{contents}
-
-    if ($repos->{elements}) {
-	$repos->{contents} ||= $repos->{elements};
-	delete $repos->{elements};
-    }
-
-    $repos;
+    $self->clone($new_repos,%args);
 }
 
 sub _update_ctrl {
     my ($self,%args) = @_;
 
     my $path = $args{path} || $self->{path};
-    my $ctrl = catfile($path,$hidden_repos_dir,'VCSControl.yml');
     for (keys %args) {
 	$self->{$_} = $args{$_};
     }
 
     $self->{updated} = localtime->datetime;
-    $self->_save_ctrl(path => $ctrl);
+    $self->save;
 }
 1;
 __END__
@@ -398,12 +405,20 @@ other code that is available for all platforms.
 
 =head2 new
 
-  my $rep = VCS::Lite::Repository->new('/local/fileSystem/path');
+  my $rep = VCS::Lite::Repository->new('/local/fileSystem/path',
+  					store => 'inSituYAML');
 
 A new repository object is created and associated with a directory on
 the local file system. If the directory does not exist, it is created.
 If the directory does not contain a repository, an empty repository
 is created.
+
+The store parameter here is used to designate the store in which
+the repository is held. This parameter can be an object, a class or
+a string representing a package name inside VCS::Lite::Repository::Store.
+The default is inSituStorable; also available in the distribution is
+inSituYAML, which requires YAML to be installed, but makes repositories
+and elements that are human readable.
 
 The control files associated with the repository live under a directory 
 .VCSLite inside the associated directory (_VCSLITE on VMS as dots are

@@ -4,26 +4,27 @@ use 5.006;
 use strict;
 use warnings;
 
-use YAML qw(:all);
-
-our $VERSION = '0.02';
+our $VERSION = '0.03';
+our $username = $ENV{VCSLITE_USER} || $ENV{USER};
+our $default_store = 'YAML';
 
 sub path {
     my $self = shift;
 
-    $self->{path};
+    return $self->{path} unless @_;
+
+    my $newpath = shift;
+    
+    if ($self->{path} ne $newpath) {
+	$self->{path} = $newpath;
+	$self->save;
+    }
 }
 
-sub _save_ctrl {
-    my ($self,%args) = @_;
+sub save {
+    my ($self) = @_;
 
-    DumpFile($args{path} ,$self);
-}
-
-sub _load_ctrl {
-    my ($pkg,%args) = @_;
-
-    LoadFile($args{path});
+    $self->{store}->save($self);
 }
 
 sub _mumble {
@@ -48,3 +49,22 @@ sub up_generation {
 
     $gen;
 }
+
+sub user {
+    my $obj = shift;
+    @_ ? ($username = shift) : $username;
+}
+
+sub default_store {
+    my $obj = shift;
+    @_ ? ($default_store = shift) : $default_store;
+}
+
+sub parent {
+    my $self = shift;
+
+    return undef unless exists $self->{parent};
+
+    $self->{parent_store}->retrieve($self->{parent});
+}
+1;

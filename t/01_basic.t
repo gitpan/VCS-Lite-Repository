@@ -7,51 +7,65 @@
 # Note: the test directory is used by subsequent tests
 
 use strict;
-use Test::More  tests => 16;
-use File::Spec::Functions qw(rel2abs catfile curdir);
+use Test::More;
+use File::Spec::Functions qw(rel2abs catfile catdir curdir updir);
 
-#01
-use_ok 'VCS::Lite::Repository';
+our @stores;
 
-{
-    no warnings;
-    $VCS::Lite::Repository::username = 'test'; # For tests on non-Unix platforms
+BEGIN {
+
+    require 'backends.pl';
+
+    @stores = test_stores();
+    plan tests => 3 + @stores * 13;
+
+    #01
+    use_ok 'VCS::Lite::Repository';
 }
+
+VCS::Lite::Repository->user('test'); # For tests on non-Unix platforms
 
 # Duff args
 
-#02 - File instead of directory
+#03 - File instead of directory
 eval {VCS::Lite::Repository->new('MANIFEST')};
 like ($@, qr(Invalid path), "File as path croaks");
 
-#03 - Garbage filespec in any O/S
+#04 - Garbage filespec in any O/S
 eval {VCS::Lite::Repository->new('/\/\~~#&')};
 like ($@, qr(Failed to create directory), "Invalid filespec croaks");
 
-my $rep = VCS::Lite::Repository->new('test');
+mkdir 'test';
 
-#04
-isa_ok($rep, 'VCS::Lite::Repository', "Successful return from new");
+for (@stores) {
+	print "# Using store $_\n";
+	my $rep = VCS::Lite::Repository->new(catdir('test',$_),
+		store => $_);
 
-#05
-my $hwtest = $rep->add_element('helloworld.c');
-isa_ok($hwtest, 'VCS::Lite::Element', 'add_element');
+	#+01
+	isa_ok($rep, 'VCS::Lite::Repository', "Successful return from new");
 
-#06
-my @eleret = $rep->elements;
-is (@eleret,1,'elements returned one element');
+	#+02
+	my $hwtest = $rep->add_element('helloworld.c');
+	isa_ok($hwtest, 'VCS::Lite::Element', 'add_element');
 
-#07
-isa_ok($eleret[0], 'VCS::Lite::Element', 'member of array returned by elements');
+	#+03
+	my @eleret = $rep->elements;
+	is (@eleret,1,'elements returned one element');
 
-#08
-is($hwtest->latest,0,"Latest generation of new element = 0");
+	#+04
+	isa_ok($eleret[0], 'VCS::Lite::Element', 
+		'member of array returned by elements');
 
-my $wkdir = rel2abs(curdir);
+	#+05
+	is($hwtest->latest,0,"Latest generation of new element = 0");
 
-chdir 'test';
+	my $wkdir = rel2abs(curdir);
 
-my $hworld = <<EOF;
+	chdir 'test';
+	chdir $_;
+
+	my $hworld = <<EOF;
 
 #include <stdio.h>
 
@@ -62,42 +76,45 @@ main() {
 
 EOF
 
-open TEST,'>','helloworld.c';
-print TEST $hworld;
-close TEST;
+	open TEST,'>','helloworld.c';
+	print TEST $hworld;
+	close TEST;
 
-$hwtest->check_in( description => 'Initial version');
+	$hwtest->check_in( description => 'Initial version');
 
-#09
-is($hwtest->latest,1,"Latest generation following check-in = 1");
+	#+06
+	is($hwtest->latest,1,"Latest generation following check-in = 1");
 
-$hworld =~ s/Hello World/Bonjour Le Monde/;
-open TEST,'>','helloworld.c';
-print TEST $hworld;
-close TEST;
+	$hworld =~ s/Hello World/Bonjour Le Monde/;
+	open TEST,'>','helloworld.c';
+	print TEST $hworld;
+	close TEST;
 
-$hwtest->check_in(description => 'Change text to French');
+	$hwtest->check_in(description => 'Change text to French');
 
-#10
-is($hwtest->latest,2,"Latest generation following second check-in = 2");
+	#+07
+	is($hwtest->latest,2,"Latest generation following second check-in = 2");
 
-my $lit1 = $hwtest->fetch( generation => 1);
+	my $lit1 = $hwtest->fetch( generation => 1);
 
-#11
-isa_ok($lit1,'VCS::Lite',"fetch generation 1 returns");
+	#+08
+	isa_ok($lit1,'VCS::Lite',"fetch generation 1 returns");
 
-my $lit2 = $hwtest->fetch( generation => 2);
+	my $lit2 = $hwtest->fetch( generation => 2);
 
-#12
-isa_ok($lit1,'VCS::Lite',"fetch generation 2 returns");
+	#+09
+	isa_ok($lit1,'VCS::Lite',"fetch generation 2 returns");
 
-my $diff=$lit1->delta($lit2)->udiff;
+	my $diff=$lit1->delta($lit2)->udiff;
 
-$diff =~ s/(@@\d+)\s/$1/g;	# Fix spurious trailing blanks from udiff
+	$diff =~ s/(@@\d+)\s/$1/g; # Fix spurious trailing blanks from udiff
 
-my $absfile = catfile($wkdir, 'test', "helloworld.c");
+	my $absfile = catfile($wkdir, 'test', $_, "helloworld.c");
 
-my $expected = <<END;
+	$absfile = lc $absfile if $^O =~ /VMS/i;	
+		#VCS::Lite::Repository 0.06 onwards
+
+	my $expected = <<END;
 --- $absfile\@\@1
 +++ $absfile\@\@2
 \@\@ -6,1 +6,1 \@\@
@@ -105,21 +122,25 @@ my $expected = <<END;
 +    printf("Bonjour Le Monde\\n");
 END
 
-#13
-is($diff,$expected,"Compare diff with expected results");
+	#+10
+	is($diff,$expected,"Compare diff with expected results");
 
-my $foorep = $rep->add_repository('foobar');
+	my $foorep = $rep->add_repository('foobar');
 
-#14
-isa_ok($foorep, 'VCS::Lite::Repository', "Return from add_repository");
+	#+11
+	isa_ok($foorep, 'VCS::Lite::Repository', "Return from add_repository");
 
-my @cont = $rep->contents;
+	my @cont = $rep->contents;
 
-#15
-is(@cont, 2, "Objects returned by contents");
+	#+12
+	is(@cont, 2, "Objects returned by contents");
 
-$rep->remove('foobar');
-@cont = $rep->contents;
+	$rep->remove('foobar');
+	@cont = $rep->contents;
 
-#16
-is(@cont, 1, "Only one object after remove");
+	#+13
+	is(@cont, 1, "Only one object after remove");
+
+	chdir updir;
+	chdir updir;
+}
