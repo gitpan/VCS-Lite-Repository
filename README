@@ -1,5 +1,5 @@
-VCS/Lite/Repository version 0.01
-================================
+VCS-Lite-Repository
+===================
 
 INSTALLATION
 
@@ -21,11 +21,29 @@ This module requires these other modules and libraries:
    Test::More
    Params::Validate
 
-COPYRIGHT AND LICENCE
+BUGS, PATCHES & FIXES
 
-   Copyright (C) 2003-2004 Ivor Williams (IVORW (at) CPAN {dot} org)
-   All rights reserved.
+There are no known bugs at the time of this release. However, if you spot a
+bug or are experiencing difficulties that are not explained within the POD
+documentation, please submit a bug to the RT system (see link below). However,
+it would help greatly if you are able to pinpoint problems or even supply a 
+patch. 
 
-   This module is free software; you can redistribute it and/or modify it
-   under the same terms as Perl itself.
-   
+Fixes are dependent upon their severity and my availability. Should a fix not
+be forthcoming, please feel free to (politely) remind me by sending an email
+to barbie@cpan.org .
+
+RT: http://rt.cpan.org/Public/Dist/Display.html?Name=VCS-Lite-Repository
+
+AUTHOR
+
+  Original Author: Ivor Williams (RIP)          2002-2009
+  Current Maintainer: Barbie <barbie@cpan.org>  2014
+
+COPYRIGHT AND LICENSE
+
+  Copyright © 2002-2009 Ivor Williams
+  Copyright © 2014      Barbie for Miss Barbell Productions.
+
+This distribution is free software; you can redistribute it and/or
+modify it under the Artistic License v2.

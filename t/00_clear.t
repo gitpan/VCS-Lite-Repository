@@ -1,12 +1,17 @@
+#!/usr/bin/perl -w
+use strict;
+
+###############################################################################
 # This is a special 'test' to clear out the residue from any
 # previous tests that were run, prior to running new tests.
-
+#
 # Note: this needs to be portable, so we can't use `rm -rf test`.
-#########################
+###############################################################################
 
-use strict;
 use Test::More  tests => 1;
 use File::Find;
+
+#----------------------------------------------------------------------------
 
 find( {
 	bydepth => 1,

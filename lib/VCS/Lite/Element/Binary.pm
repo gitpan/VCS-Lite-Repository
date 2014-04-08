@@ -1,16 +1,20 @@
-
 package VCS::Lite::Element::Binary;
+
 use strict;
+use warnings;
 
-use vars qw/$VERSION @CARP_NOT/;
+our $VERSION = '0.10';
 
-$VERSION = '0.02';
-@CARP_NOT = qw/VCS::Lite::Element/;
+#----------------------------------------------------------------------------
 
 use base qw/VCS::Lite::Element/;
 use Carp;
 use File::Spec::Functions qw/:ALL !path/;
 use Params::Validate qw(:all);
+
+our @CARP_NOT = qw/VCS::Lite::Element/;
+
+#----------------------------------------------------------------------------
 
 =head1 NAME
 
@@ -27,53 +31,15 @@ VCS::Lite::Element::Binary - Support for version control of binary files
 This module is a subclass of VCS::Lite::Element to handle versioning of 
 binary files
 
-=head1 BUGS
-
-Please post reports of bugs to rt.cpan.org
-
-=head1 AUTHOR
-
-	Ivor Williams	
-	ivorw at CPAN (dot) org
-
-=head1 COPYRIGHT
-
-Copyright (C) 2004 Ivor Williams
-
-This program is free software; you can redistribute
-it and/or modify it under the same terms as Perl itself.
-
-The full text of the license can be found in the
-LICENSE file included with this module.
-
-
-=head1 SEE ALSO
-
-L<VCS::Lite::Element>, L<VCS::Lite::Repository>
-
-=head1 METHODS
-
-See L<VCS::Lite::Element> for the list of object methods available.
-
-=over 4
-
-=item B<new>
-
-  my $obj = VCS::Lite::Element::Binary->new( $filename, [param => value...]);
-
-Constructs a VCS::Lite::Element::Binary object for a given file. Note, if
-the object has an existing YAML, it will return the existing object.
-
-If you want to create a new binary element in a repository, call C<new> then
-add it to the repository.
-
 =cut
+
+#----------------------------------------------------------------------------
 
 sub new {
     my $pkg = shift;
     my $name = shift;
     my %args = validate ( @_, {
-    		   store => 0,		# Handled by SUPER::new
+               store => 0,      # Handled by SUPER::new
                    verbose => 0,
                    recordsize => { type => SCALAR, default => 128 },
                } );
@@ -132,5 +98,55 @@ sub _contents {
 }
         
 1; #this line is important and will help the module return a true value
+
 __END__
 
+=head1 SEE ALSO
+
+L<VCS::Lite::Element>, L<VCS::Lite::Repository>
+
+=head1 METHODS
+
+See L<VCS::Lite::Element> for the list of object methods available.
+
+=over 4
+
+=item B<new>
+
+  my $obj = VCS::Lite::Element::Binary->new( $filename, [param => value...]);
+
+Constructs a VCS::Lite::Element::Binary object for a given file. Note, if
+the object has an existing YAML, it will return the existing object.
+
+If you want to create a new binary element in a repository, call C<new> then
+add it to the repository.
+
+=head1 BUGS, PATCHES & FIXES
+
+There are no known bugs at the time of this release. However, if you spot a
+bug or are experiencing difficulties that are not explained within the POD
+documentation, please send an email to barbie@cpan.org or submit a bug to the
+RT system (see link below). However, it would help greatly if you are able to 
+pinpoint problems or even supply a patch.
+
+http://rt.cpan.org/Public/Dist/Display.html?Name=VCS-Lite-Repository
+
+Fixes are dependent upon their severity and my availability. Should a fix not
+be forthcoming, please feel free to (politely) remind me.
+
+=head1 AUTHOR
+
+  Original Author: Ivor Williams (RIP)          2002-2009
+  Current Maintainer: Barbie <barbie@cpan.org>  2014
+
+=head1 COPYRIGHT
+
+  Copyright (c) Ivor Williams, 2002-2009
+  Copyright (c) Barbie,        2014
+
+=head1 LICENCE
+
+This distribution is free software; you can redistribute it and/or
+modify it under the Artistic Licence v2.
+
+=cut

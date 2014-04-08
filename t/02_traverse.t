@@ -1,7 +1,10 @@
-
+#!/usr/bin/perl -w
 use strict;
+
 use Test::More  tests => 7;
 use File::Spec::Functions qw(splitpath);
+
+#----------------------------------------------------------------------------
 
 #01
 use_ok 'VCS::Lite::Repository';

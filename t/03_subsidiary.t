@@ -1,13 +1,18 @@
+#!/usr/bin/perl -w
+use strict;
 
+###############################################################################
 # Before running this test, run the following tests:
 #
 # 00_clear.t - Remove ./test
 # 01_basic.t - Create fresh ./test/backend
+###############################################################################
 
-use strict;
 use Test::More;
 use File::Spec::Functions qw(splitpath catdir updir catfile);
 our @stores;
+
+#----------------------------------------------------------------------------
 
 BEGIN {
 	require 'backends.pl';

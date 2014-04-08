@@ -1,13 +1,18 @@
+#!/usr/bin/perl -w
+use strict;
 
+###############################################################################
 # Run the following tests before this test:
 #
 # 00_clear.t - remove ./test
 # 01_basic.t - create fresh ./test
+###############################################################################
 
-use strict;
 use Test::More;
 use File::Spec::Functions qw(updir);
 our @stores;
+
+#----------------------------------------------------------------------------
 
 BEGIN {
 	require 'backends.pl';

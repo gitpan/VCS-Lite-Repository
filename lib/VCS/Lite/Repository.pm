@@ -4,6 +4,10 @@ use 5.006;
 use strict;
 use warnings;
 
+our $VERSION = '0.10';
+
+#----------------------------------------------------------------------------
+
 use Carp;
 use File::Spec::Functions qw(:ALL !path);
 use Time::Piece;
@@ -11,17 +15,17 @@ use VCS::Lite::Element;
 use Params::Validate qw(:all);
 use Cwd qw(abs_path);
 
-our $VERSION = '0.09';
-
 use base qw(VCS::Lite::Common);
+
+#----------------------------------------------------------------------------
 
 sub new {
     my $pkg = shift;
     my $path = shift;
     my %args = validate ( @_, {
-		   store => { 
-		   	type => SCALAR | OBJECT, 
-		   	default => $pkg->default_store },
+           store => {
+            type => SCALAR | OBJECT,
+            default => $pkg->default_store },
                    verbose => 0,
                } );
     my $verbose = $args{verbose};
@@ -35,26 +39,25 @@ sub new {
 
     my $abspath = abs_path($path);
     my $proto = bless {path => $abspath,
-    		verbose => $verbose,
-    		contents => []},$pkg;
+            verbose => $verbose,
+            contents => []},$pkg;
     my $store_pkg;
     if (ref $args{store}) {
-	$store_pkg = $args{store};
+        $store_pkg = $args{store};
+    } else {
+        $store_pkg = ($args{store} =~ /\:\:/) ? $args{store} : "VCS::Lite::Store::$args{store}";
+        eval "require $store_pkg";
+        warn "Failed to require $store_pkg\n$@" if $@;
     }
-    else {
-	$store_pkg = ($args{store} =~ /\:\:/) ? $args{store} : 
-		"VCS::Lite::Store::$args{store}";
-	eval "require $store_pkg"; 
-	warn "Failed to require $store_pkg\n$@" if $@;
-    }
-    
+
     my $repos = $store_pkg->retrieve_or_create($proto);
     if (exists $repos->{elements}) {
         $repos->_mumble("Upgrading repository $abspath from 0.02 to $VERSION");
-	$repos->{contents} ||= $repos->{elements};
-	delete $repos->{elements};
-	$repos->save;
+        $repos->{contents} ||= $repos->{elements};
+        delete $repos->{elements};
+        $repos->save;
     }
+
     $repos->path($abspath);
     $repos->{author} = $repos->user;
     $repos->{verbose} = $verbose;
@@ -77,25 +80,25 @@ sub add {
         mkdir $absfile unless -d $absfile;
         $remainder = @dirs ? catpath($vol,catdir(@dirs),$fil) : $fil;
         $file = $top;
-    }
-    else {
+    } else {
         $absfile = catfile($path,$fil);
     }
 
     unless ((catdir($file) eq updir) ||
            (catdir($file) eq curdir) ||
            grep {$file eq $_} @{$self->{contents}}) {
-	$self->_mumble("Add $file to $path");
-	my @newlist = sort(@{$self->{contents}},$file);
-	$self->{transactions} ||= [];
-	my @trans = (@{$self->{transactions}}, ['add',$file]);
-	$self->_update_ctrl( contents => \@newlist,
-			transactions => \@trans);
+
+        $self->_mumble("Add $file to $path");
+
+        my @newlist = sort(@{$self->{contents}},$file);
+        $self->{transactions} ||= [];
+        my @trans = (@{$self->{transactions}}, ['add',$file]);
+        $self->_update_ctrl( contents => \@newlist, transactions => \@trans);
     }
 
     my $newobj = (-d $absfile) ? VCS::Lite::Repository->new($absfile,
-			store => $self->{store}) :
-    		VCS::Lite::Element->new($absfile, store => $self->{store});
+            store => $self->{store}) :
+            VCS::Lite::Element->new($absfile, store => $self->{store});
     $remainder ? $newobj->add($remainder) : $newobj;
 }
 
@@ -120,34 +123,33 @@ sub remove {
     my $doit = 0;
 
     for (@{$self->{contents}}) {
-	if ($file eq $_) {
-	    $doit++;
-	} else {
-	    push @contents,$_;
-	}
+        if ($file eq $_) {
+            $doit++;
+        } else {
+            push @contents,$_;
+        }
     }
     return undef unless $doit;
 
     $self->_mumble("Remove $file from " . $self->path);
     $self->{transactions} ||= [];
     my @trans = (@{$self->{transactions}}, ['remove',$file]);
-    $self->_update_ctrl( contents => \@contents,
-			transactions => \@trans);
+    $self->_update_ctrl( contents => \@contents, transactions => \@trans);
     1;
 }
 
 sub contents {
     my $self = shift;
 
-    map {my $file = catfile($self->{path},$_); 
-	(-d $file) ? 
-	    VCS::Lite::Repository->new($file, 
-	    	verbose => $self->{verbose},
-	    	store => $self->{store})
-	    : VCS::Lite::Element->new($file, 
-	    	verbose => $self->{verbose},
-	    	store => $self->{store});} 
-    	@{$self->{contents}};
+    map {my $file = catfile($self->{path},$_);
+    (-d $file) ?
+        VCS::Lite::Repository->new($file,
+            verbose => $self->{verbose},
+            store => $self->{store})
+        : VCS::Lite::Element->new($file,
+            verbose => $self->{verbose},
+            store => $self->{store});}
+        @{$self->{contents}};
 }
 
 sub elements {
@@ -166,21 +168,21 @@ sub traverse {
     my $self = shift;
     my $func = shift;
     my %args = validate(@_, {
-    		recurse => 0,
-    		params => { type => ARRAYREF | SCALAR, optional => 1 },
-    		} );
+            recurse => 0,
+            params => { type => ARRAYREF | SCALAR, optional => 1 },
+            } );
     my @out;
     $args{params} ||= [];
     $args{params} = [$args{params}] unless ref $args{params};
-    
+
     for ($self->contents) {
         if ($args{recurse} && ($args{recurse} eq 'pre')) {
             my @subout = grep {defined $_} $_->traverse($func,%args);
             push @out,\@subout if @subout;
         }
-        my @res = grep {defined $_} ((ref $func) ? 
-        	&$func($_,@{$args{params}}) : 
-        	$_->$func(@{$args{params}}));
+        my @res = grep {defined $_} ((ref $func) ?
+            &$func($_,@{$args{params}}) :
+            $_->$func(@{$args{params}}));
         push @out,@res;
         if ($args{recurse} && ($args{recurse} ne 'pre')) {
             my @subout = grep {defined $_} $_->traverse($func,%args);
@@ -194,23 +196,23 @@ sub check_out {
     my $self = shift;
     my $newpath = shift;
     my %args = validate(@_, {
-    		store => { type => SCALAR|OBJECT, optional => 1 },
-    		} );
+            store => { type => SCALAR|OBJECT, optional => 1 },
+            } );
 
     $self->_mumble("Check out " . $self->path . " to $newpath");
 #    $self->{transactions} ||= [];
-    my $newrep = VCS::Lite::Repository->new($newpath, 
-    	verbose => $self->{verbose},
-    	%args);
+    my $newrep = VCS::Lite::Repository->new($newpath,
+        verbose => $self->{verbose},
+        %args);
     $newrep->_update_ctrl( parent => $self->{path},
-    			contents => $self->{contents},
-    			original_contents => $self->{contents},
-    			parent_baseline => $self->latest,
-    			parent_store => $self->{store});
+                contents => $self->{contents},
+                original_contents => $self->{contents},
+                parent_baseline => $self->latest,
+                parent_store => $self->{store});
     $self->traverse('_check_out_member', params => [$newpath,%args]);
-    VCS::Lite::Repository->new($newpath, 
-    	verbose => $self->{verbose},
-    	%args); 
+    VCS::Lite::Repository->new($newpath,
+        verbose => $self->{verbose},
+        %args);
     # This is different from the $newrep object, as it is fully populated.
 }
 
@@ -222,51 +224,54 @@ sub check_in {
                } );
 
     $self->_mumble("Checking in " . $self->path);
-    if (($self->{transactions} && @{$self->{transactions}}) 
-		|| $args{check_in_anyway}) {
+    if (($self->{transactions} && @{$self->{transactions}})
+        || $args{check_in_anyway}) {
+
         $self->_mumble("Updating directory changes");
-	my $newgen = $args{generation} || $self->latest;
-	$newgen =~ s/(\d+)$/$1+1/e;
-	$self->{generation} ||= {};
-	my %gen = %{$self->{generation}};
-	$gen{$newgen} = {
-		author => $self->user,
-		description => $args{description},
-		updated => localtime->datetime,
-		transactions => $self->{transactions},
-		contents => $self->{contents},
-	};
 
-	$self->{latest} ||= {};
-	my %lat = %{$self->{latest}};
-	$newgen =~ /(\d+\.)*\d+$/;
-	my $base = $1 || '';
-	$lat{$base}=$newgen;
-	delete $self->{transactions};
+        my $newgen = $args{generation} || $self->latest;
+        $newgen =~ s/(\d+)$/$1+1/e;
+        $self->{generation} ||= {};
+        my %gen = %{$self->{generation}};
+        $gen{$newgen} = {
+            author => $self->user,
+            description => $args{description},
+            updated => localtime->datetime,
+            transactions => $self->{transactions},
+            contents => $self->{contents},
+        };
 
-	$self->_update_ctrl( generation => \%gen, 
-    			latest => \%lat);
+        $self->{latest} ||= {};
+        my %lat = %{$self->{latest}};
+        $newgen =~ /(\d+\.)*\d+$/;
+        my $base = $1 || '';
+        $lat{$base}=$newgen;
+        delete $self->{transactions};
+
+        $self->_update_ctrl( generation => \%gen, latest => \%lat);
     }
+
     $self->traverse('check_in', params => [%args]);
 }
 
 sub commit {
     my ($self,$parent) = @_;
 
-    my $path = $self->path; 
+    my $path = $self->path;
     my $repos_name = (splitdir($self->path))[-1];
     my $parent_repos_path = $self->{parent} || catdir($parent,$repos_name);
     $self->_mumble("Committing $path to $parent_repos_path");
-    my $parent_repos = VCS::Lite::Repository->new($parent_repos_path, 
-    		verbose => $self->{verbose},
-    		store => $self->{parent_store});
+    my $parent_repos = VCS::Lite::Repository->new(
+        $parent_repos_path,
+        verbose     => $self->{verbose},
+        store       => $self->{parent_store} || $self->{store});
 
     my $orig = VCS::Lite->new($repos_name,undef,$parent_repos->{contents});
     my $changed = VCS::Lite->new($repos_name,undef,$self->{contents});
 
     $self->_apply($parent_repos,$orig->delta($changed));
-    $self->traverse('commit', 
-    	params => $self->{parent} || catdir($parent,$repos_name));
+    $self->traverse('commit',
+        params => $self->{parent} || catdir($parent,$repos_name));
 }
 
 sub update {
@@ -281,9 +286,9 @@ sub update {
     my $parbas = $self->{parent_baseline};
 
     my $orig = $self->fetch( generation => $baseline);
-    my $parele = VCS::Lite::Repository->new($parent, 
-    	verbose => $self->{verbose},
-    	store => $self->{parent_store});
+    my $parele = VCS::Lite::Repository->new($parent,
+        verbose => $self->{verbose},
+        store => $self->{parent_store});
     my $parfrom = $parele->fetch( generation => $parbas);
     my $parlat = $parele->latest; # was latest($parbas) - buggy
     my $parto = $parele->fetch( generation => $parlat);
@@ -293,10 +298,8 @@ sub update {
     my $merged = $orig->merge($origplus,$chg);
     $parele->_apply($self,$chg->delta($merged));
 
-    $self->_update_ctrl(baseline => $self->latest,
-        parent_baseline => $parlat);
+    $self->_update_ctrl(baseline => $self->latest, parent_baseline => $parlat);
 
-    
     $self->traverse('update', params => $parent);
 }
 
@@ -310,28 +313,30 @@ sub fetch {
     my $gen = exists($args{generation}) ? $args{generation} : $self->latest;
 
     if ($args{time}) {
-	my $latest_time = '';
-	my $branch = $args{generation} || '';
-	$branch .= '.' if $branch;
+        my $latest_time = '';
+        my $branch = $args{generation} || '';
+        $branch .= '.' if $branch;
 
-	for (keys %{$self->{generation}}) {
-            next unless /^$branch\d+$/;
-	    next if $self->{generation}{$_}{updated} > $args{time};
-	    ($latest_time,$gen) = ($self->{generation}{$_}{updated}, $_)
-		if $self->{generation}{$_}{updated} > $latest_time;
-	}
-	return undef unless $latest_time;
+        for (keys %{$self->{generation}}) {
+                next unless /^$branch\d+$/;
+            next if $self->{generation}{$_}{updated} > $args{time};
+            ($latest_time,$gen) = ($self->{generation}{$_}{updated}, $_)
+            if $self->{generation}{$_}{updated} > $latest_time;
+        }
+
+        return undef unless $latest_time;
     }
+
     return undef if $gen && $self->{generation} && !$self->{generation}{$gen};
 
-    my $cont = $gen ? 
-		$self->{generation}{$gen}{contents} :
-		$self->{original_contents} || [];
+    my $cont = $gen ?
+        $self->{generation}{$gen}{contents} :
+        $self->{original_contents} || [];
     my $file = $self->{path};
     $gen ||= 0;
     VCS::Lite->new("$file\@\@$gen",undef,$cont);
 }
-                                                                      
+
 sub _apply {
     my ($src,$dest,$delt) = @_;
 
@@ -339,46 +344,46 @@ sub _apply {
 
     my $srcpath = $src->path;
     my $path = $dest->path;
-    
+
     for (map {@$_} $delt->hunks) {
-	my ($ind,$lin,$val) = @$_;
-	if ($ind eq '-') {
-	    $dest->remove($val);
-	} elsif ($ind eq '+') {
-	    my $destname = catdir($path,$val);
-	    my $srcname = catdir($srcpath,$val); 
-	    # $srcname is false if catdir can't construct a dir, e.g.
-	    # if on VMS and $val contains a dot
-	    mkdir $destname if $srcname && -d $srcname;
-	    my $newobj = $dest->add($val);
-	    if (exists($dest->{parent}) && ($dest->{parent} eq $srcpath)) {
-	        $newobj->{parent} = catdir($dest->{parent},$val);
-	        $newobj->{parent_store} = $dest->{parent_store};
-	        $newobj->{parent_baseline} = 0;
-	        $newobj->save;
-	    }
-	    if (exists($src->{parent}) && ($src->{parent} eq $path)) {
-	        my $srcobj = $src->{store}->retrieve($srcname);
-	        $srcobj->{parent} = catdir($src->{parent},$val);
-	        $srcobj->{parent_store} = $src->{parent_store};
-	        $srcobj->{parent_baseline} = 0;
-	        $srcobj->save;
-	    }
-	}
+        my ($ind,$lin,$val) = @$_;
+        if ($ind eq '-') {
+            $dest->remove($val);
+        } elsif ($ind eq '+') {
+            my $destname = catdir($path,$val);
+            my $srcname = catdir($srcpath,$val);
+            # $srcname is false if catdir can't construct a dir, e.g.
+            # if on VMS and $val contains a dot
+            mkdir $destname if $srcname && -d $srcname;
+            my $newobj = $dest->add($val);
+            if (exists($dest->{parent}) && ($dest->{parent} eq $srcpath)) {
+                $newobj->{parent} = catdir($dest->{parent},$val);
+                $newobj->{parent_store} = $dest->{parent_store};
+                $newobj->{parent_baseline} = 0;
+                $newobj->save;
+            }
+            if (exists($src->{parent}) && ($src->{parent} eq $path)) {
+                my $srcobj = $src->{store}->retrieve($srcname);
+                $srcobj->{parent} = catdir($src->{parent},$val);
+                $srcobj->{parent_store} = $src->{parent_store};
+                $srcobj->{parent_baseline} = 0;
+                $srcobj->save;
+            }
+        }
     }
 }
-    
+
 sub _check_out_member {
     my $self = shift;
     my $newpath = shift;
     my %args = validate(@_, {
-    		store => { type => SCALAR|OBJECT, optional => 1 },
-    		} );
+            store => { type => SCALAR|OBJECT, optional => 1 },
+            } );
 
     my $repos_name = (splitdir($self->path))[-1];
-    my $newrep = VCS::Lite::Repository->new($newpath, 
-    	verbose => $self->{verbose},
-    	%args);
+    my $newrep = VCS::Lite::Repository->new($newpath,
+        verbose => $self->{verbose},
+        %args);
     my $new_repos = catdir($newpath,$repos_name);
 
     $self->check_out($new_repos,%args);
@@ -389,13 +394,15 @@ sub _update_ctrl {
 
     my $path = $args{path} || $self->{path};
     for (keys %args) {
-	$self->{$_} = $args{$_};
+        $self->{$_} = $args{$_};
     }
 
     $self->{updated} = localtime->datetime;
     $self->save;
 }
+
 1;
+
 __END__
 
 =head1 NAME
@@ -413,7 +420,7 @@ VCS::Lite::Repository - Minimal version Control system - Repository object
   $dev->check_in( description => 'Apply change');
   $dev->update;
   $dev->commit;
-  
+
 =head1 DESCRIPTION
 
 VCS::Lite::Repository is a freestanding version control system that is
@@ -423,7 +430,7 @@ other code that is available for all platforms.
 =head2 new
 
   my $rep = VCS::Lite::Repository->new('/local/fileSystem/path',
-  					store => 'inSituYAML');
+                    store => 'inSituYAML');
 
 A new repository object is created and associated with a directory on
 the local file system. If the directory does not exist, it is created.
@@ -437,10 +444,10 @@ The default is inSituStorable; also available in the distribution is
 inSituYAML, which requires YAML to be installed, but makes repositories
 and elements that are human readable.
 
-The control files associated with the repository live under a directory 
+The control files associated with the repository live under a directory
 .VCSLite inside the associated directory (_VCSLITE on VMS as dots are
-not allowed in directory names on this platform), and these are in 
-L<YAML> format. The repository directory can contain VCS::Lite elements 
+not allowed in directory names on this platform), and these are in
+L<YAML> format. The repository directory can contain VCS::Lite elements
 (which are version controlled), other repository diretories, and also files
 and directories which are not version controlled.
 
@@ -449,11 +456,11 @@ and directories which are not version controlled.
   my $ele = $rep->add('foobar.pl');
   my $ele = $rep->add('mydir');
 
-If given a directory, returns a VCS::Lite::Repository object for the 
+If given a directory, returns a VCS::Lite::Repository object for the
 subdirectory. If this does not already have a repository, one is created.
 
-Otherwise it returns the VCS::Lite::Element object corresponding to a file 
-of that name. The element is added to the list of elements inside the 
+Otherwise it returns the VCS::Lite::Element object corresponding to a file
+of that name. The element is added to the list of elements inside the
 repository. If the file does not exist, it is created as zero length.
 If the file does exist, its contents become the generation 0 baseline for
 the element, otherwise generation 0 is the empty file.
@@ -483,25 +490,25 @@ your own code in a coderef (the first parameter passed will still be the
 object traversed. Return values are passed through traverse as a list.
 
 If you specify a true value for the recurse option, traverse will also
-be called on each member of $rep. This has no effect on elements 
-(VCS::Lite::Element->traverse returns undef). Return values from a 
+be called on each member of $rep. This has no effect on elements
+(VCS::Lite::Element->traverse returns undef). Return values from a
 recursion pass appear as an arrayref in the output. If you specify the
 parameter recurse as the value 'pre', traverse will be called on each
 member before the action being applied.
 
 Of course, the action can do its own recursion, instead of traverse itself
-applying the recursion. traverse is used internally to implement check_out, 
+applying the recursion. traverse is used internally to implement check_out,
 check_in, commit and update methods.
 
 =head2 check_out
 
   my $newrep = $rep->check_out( store => 'YAML');
 
-Note: prior to version 0.08, this was known as clone, but the API has 
-changed to use a more meanningful name. 
+Note: prior to version 0.08, this was known as clone, but the API has
+changed to use a more meanningful name.
 
 Checking out generates a new tree of repositories and elements, putting
-in place a relationship between the repositories; the original is the 
+in place a relationship between the repositories; the original is the
 B<parent repository>.
 
 The new repository does not have to use the same repository store as the
@@ -542,16 +549,38 @@ Modperl here - patches welcome.
 
 Integration with L<VCS> suite.
 
-=head1 COPYRIGHT
-
-   Copyright (C) 2003-2004 Ivor Williams (IVORW (at) CPAN {dot} org)
-   All rights reserved.
-
-This module is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
-
 =head1 SEE ALSO
 
 L<VCS::Lite::Element>, L<VCS::Lite>, L<YAML>.
+
+=cut
+
+=head1 BUGS, PATCHES & FIXES
+
+There are no known bugs at the time of this release. However, if you spot a
+bug or are experiencing difficulties that are not explained within the POD
+documentation, please send an email to barbie@cpan.org or submit a bug to the
+RT system (see link below). However, it would help greatly if you are able to
+pinpoint problems or even supply a patch.
+
+http://rt.cpan.org/Public/Dist/Display.html?Name=VCS-Lite-Repository
+
+Fixes are dependent upon their severity and my availability. Should a fix not
+be forthcoming, please feel free to (politely) remind me.
+
+=head1 AUTHOR
+
+  Original Author: Ivor Williams (RIP)          2002-2009
+  Current Maintainer: Barbie <barbie@cpan.org>  2014
+
+=head1 COPYRIGHT
+
+  Copyright (c) Ivor Williams, 2002-2009
+  Copyright (c) Barbie,        2014
+
+=head1 LICENCE
+
+This distribution is free software; you can redistribute it and/or
+modify it under the Artistic Licence v2.
 
 =cut

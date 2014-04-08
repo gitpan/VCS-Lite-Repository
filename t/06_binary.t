@@ -1,18 +1,22 @@
+#!/usr/bin/perl -w
+use strict;
 
+###############################################################################
 # Run test 00_clear.t first
 
 # This test creates directory ./test as a repository
 # and does rudimentary operations on a standalone repository.
 
 # Note: the test directory is used by subsequent tests
-
-use strict;
+###############################################################################
 
 use Test::More;
 use File::Spec::Functions qw(:ALL);
 use File::Copy;
 
 our @stores;
+
+#----------------------------------------------------------------------------
 
 BEGIN {
 	require 'backends.pl';
