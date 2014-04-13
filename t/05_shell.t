@@ -10,6 +10,8 @@ use strict;
 
 use Test::More;
 use File::Spec::Functions qw(updir);
+use IO::File;
+
 our @stores;
 
 #----------------------------------------------------------------------------
@@ -56,9 +58,10 @@ print "Hello World\\n";
 
 EOF
 
-    open TEST,'>','hworld.pl';
-    print TEST $hworld;
-    close TEST;
+	if(my $TEST = IO::File->new('hworld.pl','w+')) {
+        print $TEST $hworld;
+        $TEST->close;
+    }
 
     check_in('hworld.pl',"Initial version\n");
 
@@ -68,9 +71,10 @@ EOF
     is($hw->latest,1,"Check in worked, latest gen 1");
 
     $hworld =~ s/Hello World/Bonjour Le Monde/;
-    open TEST,'>','hworld.pl';
-    print TEST $hworld;
-    close TEST;
+	if(my $TEST = IO::File->new('hworld.pl','w+')) {
+        print $TEST $hworld;
+        $TEST->close;
+    }
 
     my $diff = diff( file1 => 'hworld.pl');
 
@@ -111,5 +115,3 @@ END
     chdir updir;
     chdir updir;
 }
-
-    

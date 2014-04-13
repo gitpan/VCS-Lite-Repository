@@ -3,7 +3,7 @@ package VCS::Lite::Common;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -64,7 +64,7 @@ sub latest {
 sub up_generation {
     my ($self,$gen) = @_;
 
-    $gen =~ s/\.0$// or $gen =~ s/([1-9]\d*)$/$1-1/e or return undef;
+    $gen =~ s/\.0$// or $gen =~ s/([1-9]\d*)$/$1-1/e or return;
     $gen;
 }
 
@@ -81,7 +81,7 @@ sub default_store {
 sub parent {
     my $self = shift;
 
-    return undef unless exists $self->{parent};
+    return unless exists $self->{parent};
 
     $self->{parent_store}->retrieve($self->{parent});
 }
@@ -89,6 +89,51 @@ sub parent {
 1;
 
 __END__
+
+#----------------------------------------------------------------------------
+
+=head1 NAME
+
+VCS::Lite::Common - Minimal Version Control System - Base class methods
+
+=head1 DESCRIPTION
+
+This is the Base class used by the repository objects, containing common
+methods used in the different classes.
+
+=head1 METHODS
+
+=head2 path
+
+Returns the current path, or saves a new path is one is given.
+
+=head2 name
+
+Returns the file name of the current object.
+
+=head2 store
+
+Return storage object.
+
+=head2 save
+
+Save the current object via storage object.
+
+=head2 latest
+
+=head2 up_generation
+
+=head2 user
+
+Returns the current user.
+
+=head2 default_store
+
+Returns the default storage class.
+
+=head2 parent
+
+Returns the parent object.
 
 =head1 BUGS, PATCHES & FIXES
 

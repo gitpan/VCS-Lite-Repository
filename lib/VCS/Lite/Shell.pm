@@ -3,7 +3,7 @@ package VCS::Lite::Shell;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -89,18 +89,22 @@ sub fetch {
 }
 
 sub diff {
-    my %par = validate( @_, {
-        file1 => { type => SCALAR },
-        gen1 => { type => SCALAR,
-            optional => 1,
-            regex => qr/^\d+$/
+    my %par = validate( @_, 
+        {
+            file1 => { type => SCALAR },
+            gen1 => { 
+                type => SCALAR,
+                optional => 1,
+                regex => qr/^\d+$/
             },
-        file2 => { type => SCALAR,
-            optional => 1,
+            file2 => { 
+                type => SCALAR,
+                optional => 1,
             },
-        gen2 => { type => SCALAR,
-            optional => 1,
-            regex => qr/^\d+$|^latest$/
+            gen2 => { 
+                type => SCALAR,
+                optional => 1,
+                regex => qr/^\d+$|^latest$/
             },
         } );
 
@@ -147,6 +151,7 @@ sub update {
 
 __END__
 
+#----------------------------------------------------------------------------
 
 =head1 NAME
 
@@ -177,6 +182,8 @@ on the current working directory and the contents thereof.
 
 The functions check_out, commit and update operate on a pair of repository
 trees: the current repository and parent repository.
+
+=head1 METHODS
 
 =head2 add
 
@@ -209,6 +216,12 @@ Checking in a repository has two effects: any transactions to the repository,
 i.e. adds and removes, are committed to the repository's transaction history,
 and the check_in is applied recursively to everything (now) in the repository.
 
+=head2 check_out
+
+Checking out generates a new tree of repositories and elements, putting
+in place a relationship between the repositories; the original is the
+B<parent repository>.
+
 =head2 fetch
 
   print fetch('foo.pl');
@@ -231,6 +244,31 @@ value of file1; gen1 defaults to the latest generation of file1.
 If no gen2 is specified, diff uses the file file2 outside the repository
 (file1 if no file2 is specified). If you want diff to use the latest
 generation of file2 instead, specify gen2 as 'latest'.
+
+=head2 commit
+
+This method is used to propagate a change from a repository to its parent.
+
+=head2 update
+
+This method applies changes that have happened to the parent, to the
+repository. This will merge with any changes in the current repository.
+
+=head2 list
+
+Returns a list of all the repository objects.
+
+=head2 member
+
+Returns a repository element object for the given element.
+
+=head2 repository
+
+Returns a repository object for the given path.
+
+=head2 store
+
+Set the storage type.
 
 =head1 SEE ALSO
 

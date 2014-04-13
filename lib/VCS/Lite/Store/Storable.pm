@@ -3,7 +3,7 @@ package VCS::Lite::Store::Storable;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -35,6 +35,28 @@ sub repos_name {
 1;
 
 __END__
+
+#----------------------------------------------------------------------------
+
+=head1 NAME
+
+VCS::Lite::Store::Storable - Minimal Version Control System - Storable backend
+
+=head1 METHODS
+
+See L<VCS::Lite::Store> for the list of object methods available.
+
+=head2 load
+
+Loads the given repository.
+
+=head2 save
+
+Saves the current repository.
+
+=head2 repos_name
+
+Returns the name of the current repository.
 
 =head1 BUGS, PATCHES & FIXES
 

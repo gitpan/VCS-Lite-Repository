@@ -3,7 +3,7 @@ package VCS::Lite::Element::Binary;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -16,33 +16,15 @@ our @CARP_NOT = qw/VCS::Lite::Element/;
 
 #----------------------------------------------------------------------------
 
-=head1 NAME
-
-VCS::Lite::Element::Binary - Support for version control of binary files 
-
-=head1 SYNOPSIS
-
-  use VCS::Lite::Element::Binary;
-
-  my $bin_ele = VCS::Lite::Element::Binary->new('foo.jpg', recordsize => 16);
-
-=head1 DESCRIPTION
-
-This module is a subclass of VCS::Lite::Element to handle versioning of 
-binary files
-
-=cut
-
-#----------------------------------------------------------------------------
-
 sub new {
-    my $pkg = shift;
+    my $pkg  = shift;
     my $name = shift;
-    my %args = validate ( @_, {
-               store => 0,      # Handled by SUPER::new
-                   verbose => 0,
-                   recordsize => { type => SCALAR, default => 128 },
-               } );
+    my %args = validate ( @_, 
+        {
+            store       => 0,   # Handled by SUPER::new
+            verbose     => 0,
+            recordsize  => { type => SCALAR, default => 128 },
+        } );
     $pkg->SUPER::new($name,%args);
 }
 
@@ -78,8 +60,7 @@ sub _contents {
             my $str = pack 'n',length $_;
             syswrite($out,$str.$_);
         }
-    }
-    else {
+    } else {
         return [] unless -f $bin;
         my $in;
 
@@ -101,17 +82,28 @@ sub _contents {
 
 __END__
 
-=head1 SEE ALSO
+#----------------------------------------------------------------------------
 
-L<VCS::Lite::Element>, L<VCS::Lite::Repository>
+=head1 NAME
+
+VCS::Lite::Element::Binary - Minimal Version Control System - binary file support
+
+=head1 SYNOPSIS
+
+  use VCS::Lite::Element::Binary;
+
+  my $bin_ele = VCS::Lite::Element::Binary->new('foo.jpg', recordsize => 16);
+
+=head1 DESCRIPTION
+
+This module is a subclass of VCS::Lite::Element to handle versioning of 
+binary files
 
 =head1 METHODS
 
 See L<VCS::Lite::Element> for the list of object methods available.
 
-=over 4
-
-=item B<new>
+=head2 new
 
   my $obj = VCS::Lite::Element::Binary->new( $filename, [param => value...]);
 
@@ -120,6 +112,10 @@ the object has an existing YAML, it will return the existing object.
 
 If you want to create a new binary element in a repository, call C<new> then
 add it to the repository.
+
+=head1 SEE ALSO
+
+L<VCS::Lite::Element>, L<VCS::Lite::Repository>
 
 =head1 BUGS, PATCHES & FIXES
 

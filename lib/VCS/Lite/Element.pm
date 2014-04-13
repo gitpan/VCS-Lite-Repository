@@ -3,7 +3,7 @@ package VCS::Lite::Element;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -19,16 +19,17 @@ use base qw(VCS::Lite::Common);
 #----------------------------------------------------------------------------
 
 sub new {
-    my $pkg = shift;
+    my $pkg  = shift;
     my $file = shift;
-    my %args = validate ( @_, {
-               store => {
-                type => SCALAR | OBJECT,
+    my %args = validate ( @_, 
+        {
+            store => {
+                type    => SCALAR | OBJECT,
                 default => $pkg->default_store,
-                },
-                   verbose => 0,
-                   recordsize => 0, #ignored unless VCS::Lite::Element::Binary
-               } );
+            },
+            verbose     => 0,
+            recordsize  => 0, #ignored unless VCS::Lite::Element::Binary
+        } );
     my $lite = $file;
     my $verbose = $args{verbose};
 
@@ -76,16 +77,17 @@ sub new {
 
 sub check_in {
     my $self = shift;
-    my %args = validate ( @_, {
-                   check_in_anyway => 0,
-                   description => { type => SCALAR },
-               } );
+    my %args = validate ( @_, 
+        {
+            check_in_anyway => 0,
+            description     => { type => SCALAR },
+        } );
     my $file = $self->{path};
 
     my $lite = $self->_slurp_lite($file);
 
     my $newgen = $self->_assimilate($lite);
-    return undef if !$newgen && !$args{check_in_anyway};
+    return if !$newgen && !$args{check_in_anyway};
 
     $self->_mumble("Check in $file");
     $self->{generation} ||= {};
@@ -121,10 +123,11 @@ sub traverse {
 
 sub fetch {
     my $self = shift;
-    my %args = validate ( @_, {
-                   time => 0,
-                   generation => 0,
-               } );
+    my %args = validate ( @_, 
+        {
+            time        => 0,
+            generation  => 0,
+        } );
 
     my $gen = $args{generation} || $self->latest;
 
@@ -138,9 +141,9 @@ sub fetch {
             ($latest_time,$gen) = ($self->{generation}{$_}{updated}, $_)
             if $self->{generation}{$_}{updated} > $latest_time;
         }
-        return undef unless $latest_time;
+        return unless $latest_time;
     }
-    return undef if $self->{generation} && !$self->{generation}{$gen};
+    return if $self->{generation} && !$self->{generation}{$gen};
 
     my $skip_to;
     my @out;
@@ -160,7 +163,7 @@ sub fetch {
         next if /^=/;
 
         if (/^ /) {
-                push @out,substr($_,1);
+            push @out,substr($_,1);
         }
     }
 
@@ -211,15 +214,18 @@ sub update {
 }
 
 sub _check_out_member {
-    my $self = shift;
+    my $self    = shift;
     my $newpath = shift;
-    my %args = validate(@_, {
-                store => { type => SCALAR|OBJECT, optional => 1 },
-                } );
+    my %args = validate(@_, 
+        {
+            store => { type => SCALAR|OBJECT, optional => 1 },
+        } );
 
-    my $repos = VCS::Lite::Repository->new($newpath,
+    my $repos = VCS::Lite::Repository->new(
+        $newpath,
         verbose => $self->{verbose},
         %args);
+
     my ($vol,$dir,$fil) = splitpath($self->path);
     my $newfil = catfile($newpath,$fil);
     my $out;
@@ -313,7 +319,7 @@ sub _assimilate {
     }
 
     push @newcont,"=$genbase\n" if ($prev ne 'u');
-    return undef unless $changed;
+    return unless $changed;
     $self->_contents(\@newcont);
     $genbase;
 }
@@ -346,7 +352,7 @@ sub _contents {
     my $self = shift;
 
     $self->{contents} = shift if @_;
-    return undef unless exists $self->{contents};
+    return unless exists $self->{contents};
 
     $self->{contents};
 }
@@ -360,6 +366,8 @@ sub _slurp_lite {
 1;
 
 __END__
+
+#----------------------------------------------------------------------------
 
 =head1 NAME
 
@@ -384,12 +392,22 @@ repository.
 This information includes the history of the element, in terms of its
 generations.
 
+=head1 METHODS
+
 =head2 new
 
   my $ele=VCS::Lite::Element->new('/home/me/dev/testfile.c');
 
 Constructs a VCS::Lite::Element for a given element in a repository.
 Returns undef if the element is not found in the repository.
+
+=head2 repository
+
+Create a repository object from the current path.
+
+=head2 traverse
+
+Does nothing currently.
 
 =head2 fetch
 

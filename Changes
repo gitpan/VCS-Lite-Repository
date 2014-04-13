@@ -1,6 +1,10 @@
 Revision history for VCS::Lite::Repository
 ==========================================
 
+0.11    2014-04-13
+        - clean up of code.
+        - documentation updates
+
 0.10    2014-04-08
         - change file dates changed to meet W3CDTF standards.
         - new maintainer, Barbie, due to the untimely death of Ivor Williams.

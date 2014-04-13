@@ -1,6 +1,6 @@
 {
     "name": "VCS-Lite-Repository",
-    "version": "0.10",
+    "version": "0.11",
     "abstract": "A minimal version control system - the repository",
     "author": ["Barbie <barbie@cpan.org>"],
 
@@ -43,35 +43,35 @@
     "provides": {
         "VCS::Lite::Common": {
             "file": "lib/VCS/Lite/Common.pm",
-            "version": "0.10"
+            "version": "0.11"
         },
         "VCS::Lite::Element": {
             "file": "lib/VCS/Lite/Element.pm",
-            "version": "0.10"
+            "version": "0.11"
         },
         "VCS::Lite::Element::Binary": {
             "file": "lib/VCS/Lite/Element/Binary.pm",
-            "version": "0.10"
+            "version": "0.11"
         },
         "VCS::Lite::Repository": {
             "file": "lib/VCS/Lite/Repository.pm",
-            "version": "0.10"
+            "version": "0.11"
         },
         "VCS::Lite::Shell": {
             "file": "lib/VCS/Lite/Shell.pm",
-            "version": "0.10"
+            "version": "0.11"
         },
         "VCS::Lite::Store": {
             "file": "lib/VCS/Lite/Store.pm",
-            "version": "0.10"
+            "version": "0.11"
         },
         "VCS::Lite::Store::Storable": {
             "file": "lib/VCS/Lite/Store/Storable.pm",
-            "version": "0.10"
+            "version": "0.11"
         },
         "VCS::Lite::Store::YAML": {
             "file": "lib/VCS/Lite/Store/YAML.pm",
-            "version": "0.10"
+            "version": "0.11"
         }
     },
     "no_index": {

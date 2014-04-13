@@ -12,6 +12,7 @@ use strict;
 
 use Test::More;
 use File::Spec::Functions qw(rel2abs catfile catdir curdir updir);
+use IO::File;
 
 our @stores;
 
@@ -81,9 +82,10 @@ main() {
 
 EOF
 
-	open TEST,'>','helloworld.c';
-	print TEST $hworld;
-	close TEST;
+	if(my $TEST = IO::File->new('helloworld.c','w+')) {
+        print $TEST $hworld;
+        $TEST->close;
+    }
 
 	$hwtest->check_in( description => 'Initial version');
 
@@ -91,9 +93,10 @@ EOF
 	is($hwtest->latest,1,"Latest generation following check-in = 1");
 
 	$hworld =~ s/Hello World/Bonjour Le Monde/;
-	open TEST,'>','helloworld.c';
-	print TEST $hworld;
-	close TEST;
+	if(my $TEST = IO::File->new('helloworld.c','w+')) {
+        print $TEST $hworld;
+        $TEST->close;
+    }
 
 	$hwtest->check_in(description => 'Change text to French');
 

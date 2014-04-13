@@ -4,7 +4,7 @@ use 5.006;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -22,12 +22,15 @@ use base qw(VCS::Lite::Common);
 sub new {
     my $pkg = shift;
     my $path = shift;
-    my %args = validate ( @_, {
-           store => {
-            type => SCALAR | OBJECT,
-            default => $pkg->default_store },
-                   verbose => 0,
-               } );
+    my %args = validate ( @_, 
+        {
+            store   => {
+                type    => SCALAR | OBJECT,
+                default => $pkg->default_store 
+            },
+            verbose => 0,
+        } );
+
     my $verbose = $args{verbose};
 
     if (-d $path) {
@@ -38,9 +41,12 @@ sub new {
     }
 
     my $abspath = abs_path($path);
-    my $proto = bless {path => $abspath,
-            verbose => $verbose,
-            contents => []},$pkg;
+    my $proto = bless {
+        path        => $abspath,
+        verbose     => $verbose,
+        contents    => []
+    },$pkg;
+
     my $store_pkg;
     if (ref $args{store}) {
         $store_pkg = $args{store};
@@ -72,6 +78,7 @@ sub add {
     my ($vol,$dirs,$fil) = splitpath($file);
     my $absfile;
     my $remainder;
+
     if ($dirs) {
         my ($top,@dirs) = splitdir($dirs);
         $top = shift @dirs if $top eq '';     # VMS quirk
@@ -96,9 +103,12 @@ sub add {
         $self->_update_ctrl( contents => \@newlist, transactions => \@trans);
     }
 
-    my $newobj = (-d $absfile) ? VCS::Lite::Repository->new($absfile,
-            store => $self->{store}) :
-            VCS::Lite::Element->new($absfile, store => $self->{store});
+    my $newobj = (
+        -d $absfile) 
+            ? VCS::Lite::Repository->new($absfile, store => $self->{store}) 
+            : VCS::Lite::Element->new($absfile, store => $self->{store}
+    );
+    
     $remainder ? $newobj->add($remainder) : $newobj;
 }
 
@@ -109,7 +119,7 @@ sub add_element {
 
 sub add_repository {
     my ($self,$dir) = @_;
-    return undef if -f $dir;
+    return if -f $dir;
 
     mkdir catfile($self->{path},$dir);
     add(@_);
@@ -129,7 +139,7 @@ sub remove {
             push @contents,$_;
         }
     }
-    return undef unless $doit;
+    return unless $doit;
 
     $self->_mumble("Remove $file from " . $self->path);
     $self->{transactions} ||= [];
@@ -141,15 +151,16 @@ sub remove {
 sub contents {
     my $self = shift;
 
-    map {my $file = catfile($self->{path},$_);
-    (-d $file) ?
-        VCS::Lite::Repository->new($file,
-            verbose => $self->{verbose},
-            store => $self->{store})
-        : VCS::Lite::Element->new($file,
-            verbose => $self->{verbose},
-            store => $self->{store});}
-        @{$self->{contents}};
+    map {
+        my $file = catfile($self->{path},$_);
+        (-d $file) 
+            ? VCS::Lite::Repository->new($file,
+                verbose => $self->{verbose},
+                store => $self->{store})
+            : VCS::Lite::Element->new($file,
+                verbose => $self->{verbose},
+                store => $self->{store});
+        } @{$self->{contents}};
 }
 
 sub elements {
@@ -167,10 +178,12 @@ sub repositories {
 sub traverse {
     my $self = shift;
     my $func = shift;
-    my %args = validate(@_, {
+    my %args = validate(@_, 
+        {
             recurse => 0,
             params => { type => ARRAYREF | SCALAR, optional => 1 },
-            } );
+        } );
+
     my @out;
     $args{params} ||= [];
     $args{params} = [$args{params}] unless ref $args{params};
@@ -195,22 +208,27 @@ sub traverse {
 sub check_out {
     my $self = shift;
     my $newpath = shift;
-    my %args = validate(@_, {
+    my %args = validate(@_, 
+        {
             store => { type => SCALAR|OBJECT, optional => 1 },
-            } );
+        } );
 
     $self->_mumble("Check out " . $self->path . " to $newpath");
 #    $self->{transactions} ||= [];
-    my $newrep = VCS::Lite::Repository->new($newpath,
+    my $newrep = VCS::Lite::Repository->new(
+        $newpath,
         verbose => $self->{verbose},
         %args);
-    $newrep->_update_ctrl( parent => $self->{path},
-                contents => $self->{contents},
-                original_contents => $self->{contents},
-                parent_baseline => $self->latest,
-                parent_store => $self->{store});
+    $newrep->_update_ctrl( 
+        parent              => $self->{path},
+        contents            => $self->{contents},
+        original_contents   => $self->{contents},
+        parent_baseline     => $self->latest,
+        parent_store        => $self->{store}
+    );
     $self->traverse('_check_out_member', params => [$newpath,%args]);
-    VCS::Lite::Repository->new($newpath,
+    VCS::Lite::Repository->new(
+        $newpath,
         verbose => $self->{verbose},
         %args);
     # This is different from the $newrep object, as it is fully populated.
@@ -218,10 +236,11 @@ sub check_out {
 
 sub check_in {
     my $self = shift;
-    my %args = validate ( @_, {
-                   check_in_anyway => 0,
-                   description => { type => SCALAR },
-               } );
+    my %args = validate ( @_, 
+        {
+            check_in_anyway => 0,
+            description     => { type => SCALAR },
+        } );
 
     $self->_mumble("Checking in " . $self->path);
     if (($self->{transactions} && @{$self->{transactions}})
@@ -234,11 +253,11 @@ sub check_in {
         $self->{generation} ||= {};
         my %gen = %{$self->{generation}};
         $gen{$newgen} = {
-            author => $self->user,
-            description => $args{description},
-            updated => localtime->datetime,
-            transactions => $self->{transactions},
-            contents => $self->{contents},
+            author          => $self->user,
+            description     => $args{description},
+            updated         => localtime->datetime,
+            transactions    => $self->{transactions},
+            contents        => $self->{contents},
         };
 
         $self->{latest} ||= {};
@@ -286,12 +305,14 @@ sub update {
     my $parbas = $self->{parent_baseline};
 
     my $orig = $self->fetch( generation => $baseline);
-    my $parele = VCS::Lite::Repository->new($parent,
+    my $parele = VCS::Lite::Repository->new(
+        $parent,
         verbose => $self->{verbose},
         store => $self->{parent_store});
-    my $parfrom = $parele->fetch( generation => $parbas);
-    my $parlat = $parele->latest; # was latest($parbas) - buggy
-    my $parto = $parele->fetch( generation => $parlat);
+
+    my $parfrom  = $parele->fetch( generation => $parbas);
+    my $parlat   = $parele->latest; # was latest($parbas) - buggy
+    my $parto    = $parele->fetch( generation => $parlat);
     my $origplus = $parfrom->merge($parto,$orig);
 
     my $chg = VCS::Lite->new($repos_name,undef,$self->{contents});
@@ -305,10 +326,11 @@ sub update {
 
 sub fetch {
     my $self = shift;
-    my %args = validate ( @_, {
-                   time => 0,
-                   generation => 0,
-               } );
+    my %args = validate ( @_, 
+        {
+            time        => 0,
+            generation  => 0,
+        } );
 
     my $gen = exists($args{generation}) ? $args{generation} : $self->latest;
 
@@ -324,14 +346,16 @@ sub fetch {
             if $self->{generation}{$_}{updated} > $latest_time;
         }
 
-        return undef unless $latest_time;
+        return unless $latest_time;
     }
 
-    return undef if $gen && $self->{generation} && !$self->{generation}{$gen};
+    return if $gen && $self->{generation} && !$self->{generation}{$gen};
 
-    my $cont = $gen ?
-        $self->{generation}{$gen}{contents} :
-        $self->{original_contents} || [];
+    my $cont = 
+        $gen 
+            ? $self->{generation}{$gen}{contents} 
+            : $self->{original_contents} || [];
+
     my $file = $self->{path};
     $gen ||= 0;
     VCS::Lite->new("$file\@\@$gen",undef,$cont);
@@ -340,7 +364,7 @@ sub fetch {
 sub _apply {
     my ($src,$dest,$delt) = @_;
 
-    return undef unless $delt;
+    return unless $delt;
 
     my $srcpath = $src->path;
     my $path = $dest->path;
@@ -374,16 +398,19 @@ sub _apply {
 }
 
 sub _check_out_member {
-    my $self = shift;
+    my $self    = shift;
     my $newpath = shift;
-    my %args = validate(@_, {
+    my %args = validate(@_, 
+        {
             store => { type => SCALAR|OBJECT, optional => 1 },
-            } );
+        } );
 
     my $repos_name = (splitdir($self->path))[-1];
-    my $newrep = VCS::Lite::Repository->new($newpath,
+    my $newrep = VCS::Lite::Repository->new(
+        $newpath,
         verbose => $self->{verbose},
         %args);
+
     my $new_repos = catdir($newpath,$repos_name);
 
     $self->check_out($new_repos,%args);
@@ -404,6 +431,8 @@ sub _update_ctrl {
 1;
 
 __END__
+
+#----------------------------------------------------------------------------
 
 =head1 NAME
 
@@ -467,7 +496,7 @@ the element, otherwise generation 0 is the empty file.
 
 The methods add_element and add_repository do the same thing, but check
 to make sure that the paremeter is a plain file (or a directory in the case
-of add_repository) and return undef if this is not the case. Add_repository
+of add_repository) and return if this is not the case. Add_repository
 will also create the directory if it does not exist.
 
 =head2 remove
@@ -527,6 +556,30 @@ This method is used to propagate a change from a repository to its parent.
 
 This method applies changes that have happened to the parent, to the
 repository. This will merge with any changes in the current repository.
+
+=head2 repositories
+
+Return the currently available repositories.
+
+=head2 add_repository
+
+Add a repository to the current parent.
+
+=head2 elements
+
+Return the list of elements in the current repository.
+
+=head2 add_element
+
+Add an element to the current repository.
+
+=head2 contents
+
+Returns the full contents of the current repository, as objects.
+
+=head2 fetch
+
+Returns the VCS object for a given generation, or the latest generation.
 
 =head1 ENVIRONMENT VARIABLES
 

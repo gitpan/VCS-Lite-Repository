@@ -3,7 +3,7 @@ package VCS::Lite::Store;
 use strict;
 use warnings;
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 #----------------------------------------------------------------------------
 
@@ -25,7 +25,7 @@ sub retrieve {
     my ($self, $path) = @_;
 
     my $store_file = $self->store_path($path);
-    return undef unless -e $store_file;
+    return unless -e $store_file;
     my $obj = $self->load($store_file) or die "Failed to retrieve $path";
     $obj->{store} = $self;
     $obj;
@@ -90,6 +90,8 @@ sub store_path {
 
 __END__
 
+#----------------------------------------------------------------------------
+
 =head1 NAME
 
 VCS::Lite::Store - Base class for repository persistence stores
@@ -107,7 +109,7 @@ VCS::Lite::Store - Base class for repository persistence stores
 =head1 DESCRIPTION
 
 The L<VCS::Lite::Repository> version control system offers a choice of
-back end storage mechanism. It is architected such that new back end
+back end storage mechanisms. It is architected such that new back end
 stores can be written, that will plug in with the existing classes.
 The store is used as an object persistence mechanism for
 L<VCS::Lite::Repository> and L<VCS::Lite::Element> objects. The store
@@ -119,7 +121,7 @@ VCS::Lite::Repository->new and VCS::Lite::Element->new as the optional
 parameter I<store>. Note that this parameter can take a class name
 instead, see L<In Situ Stores> below.
 
-=head1 METHOD CALLS
+=head1 METHODS
 
 =head2 new
 
@@ -157,7 +159,7 @@ username.
 
 This is the call which is made by the L<VCS::Lite::Element> and
 L<VCS::Lite::Repository> constructors, to retrieve an existing object
-from the store. Return undef if the object does not exist.
+from the store. return if the object does not exist.
 
 =head2 create
 

@@ -5,19 +5,20 @@ use warnings;
 use 5.006;
 
 use ExtUtils::MakeMaker;
+use IO::File;
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 
-open BACK,'>backends.pl';
-
-if (eval {require YAML; 1;}) {
-	print BACK "sub test_stores {qw/YAML Storable/;} 1;\n";
-} else {
-	warn "Tests for in situ YAML will be skipped as YAML is not installed";
-	print BACK "sub test_stores {qw/Storable/;} 1;\n";
+if(my $BACK = IO::File->new('backends.pl','w+')) {
+    if (eval {require YAML; 1;}) {
+        print $BACK "sub test_stores {qw/YAML Storable/;} 1;\n";
+    } else {
+        warn "Tests for in situ YAML will be skipped as YAML is not installed";
+        print $BACK "sub test_stores {qw/Storable/;} 1;\n";
+    }
+    $BACK->close;
 }
-close BACK;
 
 my @exe;
 
